@@ -96,6 +96,7 @@ function CreateInner() {
   };
   const [planDate, setPlanDate] = useState(todayStr());
   const opened = useRef("");
+  const lastAuto = useRef("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const request = useRef<AbortController | null>(null);
   const main = useRef<HTMLElement>(null);
@@ -125,6 +126,36 @@ function CreateInner() {
     return () => { window.removeEventListener("beforeunload", warn); document.removeEventListener("click", guard, true); };
   }, [dirty, imageBusy]);
   useEffect(() => { setChecked(false); }, [title, body, tags, images]);
+  // ChatGPT 탭에서 복사한 결과가 있으면 붙여넣기 칸에 자동 입력 (권한 없으면 조용히 패스)
+  useEffect(() => {
+    if (!showPaste) return;
+    let cancelled = false;
+    const fill = async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        if (cancelled || !text || text.trim().length < 20 || text === lastAuto.current) return;
+        let replaced = false;
+        setPasted(prev => {
+          if (prev && prev.trim()) return prev;
+          if (text.trim() === hostPrompt.trim()) return prev;
+          replaced = true;
+          return text;
+        });
+        queueMicrotask(() => {
+          if (cancelled || !replaced || lastAuto.current === text) return;
+          lastAuto.current = text;
+          log("클립보드에서 작성 결과 자동 입력");
+          say("복사된 결과를 가져왔어요. 확인 후 적용하세요.");
+        });
+      } catch { /* 클립보드 권한 없으면 수동 붙여넣기 유지 */ }
+    };
+    void fill();
+    const onFocus = () => { void fill(); };
+    const onVis = () => { if (document.visibilityState === "visible") void fill(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVis);
+    return () => { cancelled = true; window.removeEventListener("focus", onFocus); document.removeEventListener("visibilitychange", onVis); };
+  }, [showPaste, hostPrompt]);
   useEffect(() => {
     if (!loaded) return;
     const id = params.get("id") ?? params.get("reuse");
@@ -323,7 +354,6 @@ function CreateInner() {
           {similarity >= 55 && <div className="ws-note ws-form-group"><UiIcon name="info" size={17} />최근 글과 문장이 비슷해요. 반복되는 표현을 확인해 주세요.</div>}
           <details className="ws-disclosure"><summary>문장 다듬기 · 다른 제목 제안</summary><div className="ws-chips">{EDIT_ACTIONS.map(a => <button className="ws-chip" type="button" key={a.id} disabled={!body.trim()} onClick={() => edit(a.id)}>{a.label}</button>)}</div>{altTitles.map(t => <button type="button" key={t} className="ws-button ws-button-wide ws-form-group" onClick={() => { setTitle(t); setAltTitles([]); }}>{t}</button>)}</details><div className="ws-editor-actions"><button className="ws-button" type="button" onClick={() => save("초안")}><UiIcon name="library" size={16} />초안 저장</button><button className="ws-button" type="button" disabled={!body.trim()} onClick={() => void copy(exportText())}><UiIcon name="copy" size={16} />글 복사</button></div></section>
         <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={!ready} onClick={() => go("sec-images", 3)}>이 초안으로 이미지 준비하기<UiIcon name="arrow" /></button><button type="button" className="ws-text-link ws-button-wide" disabled={!ready} onClick={() => go("sec-publish", 4)}>이미지 없이 발행 준비</button>
-      </section>
       <div id="sec-images"><ImageStudio title={title} body={body} hashtags={tags} draft={studio} onChange={setStudio} onEdit={() => go("sec-draft", 2)} onBusyChange={setImageBusy} />
         <div className="ws-editor-actions ws-form-group"><button type="button" className="ws-button" disabled={imageBusy} onClick={() => save("초안")}>글·이미지 저장</button><button type="button" className="ws-button ws-button-primary" disabled={!ready || imageBusy} onClick={() => go("sec-publish", 4)}>발행 준비<UiIcon name="arrow" size={16} /></button></div><p className="ws-helper ws-form-group">이미지 없이 넘어가도 괜찮아요. 저장해야 보관함에서 이어 쓸 수 있어요.</p></div>
       <div id="sec-publish"><section className="ws-panel ws-compose"><h2>발행 전에 한 번 확인해 주세요.</h2><p className="ws-helper">실제 당근 화면과 다를 수 있는 미리보기예요.</p><div className="ws-preview ws-form-group"><PhonePreview title={title} body={exportText().slice(title.length).trim()} bizName={brand.businessName} time="미리보기" imageCopy="" imageSub="" bg={brand.color} logo={brand.logoUrl} logoText={brand.logoText} aiImages={images} /></div><div className="ws-checklist"><label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /><span>시세·거래 사례·연락처를 확인했어요. 생성한 이미지를 실제 매장·고객 사진으로 오해하게 쓰지 않아요.</span></label></div><div className="ws-editor-actions"><button type="button" className="ws-button" onClick={() => go("sec-draft", 2)}>글 수정</button><button type="button" className="ws-button" onClick={() => go("sec-images", 3)}>이미지 수정</button><button type="button" className="ws-button" disabled={!checked} onClick={() => save("검수 완료")}>검수 완료로 저장</button></div><button type="button" className="ws-button ws-button-primary ws-button-wide ws-form-group" disabled={!checked || payloadBusy} onClick={() => void openSend()}>당근 발행 준비<UiIcon name="external" size={17} /></button><p className="ws-helper ws-form-group">실제 발행은 당근에서 내용을 확인하고 등록해야 완료돼요.</p></section><section className="ws-panel"><label htmlFor="plan-date" className="ws-label">나중에 올릴 예정인가요?</label><p className="ws-helper">자동 발행이 아니라 캘린더에 예정일을 기록해요.</p><div className="ws-secondary-actions ws-form-group"><input className="ws-input" id="plan-date" type="date" value={planDate} min={todayStr()} onChange={e => setPlanDate(e.target.value)} /><button type="button" className="ws-button" disabled={!checked || !planDate || planDate < todayStr()} onClick={() => save("발행 예정")}>발행 예정일 저장</button></div></section></div>
