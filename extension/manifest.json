@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "당근 Post AI 자동입력",
+  "version": "1.4.1",
+  "description": "당근 Post AI에서 만든 제목·본문·AI 이미지를 당근 소식 작성 페이지에 자동 입력합니다. GPT 탭 자동 전송 지원.",
+  "permissions": ["storage", "clipboardRead"],
+  "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
+  "host_permissions": [
+    "https://www.daangn.com/*",
+    "https://business.daangn.com/*",
+    "https://image.pollinations.ai/*",
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "당근 Post AI",
+    "default_icon": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.daangn.com/*", "https://business.daangn.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://gemini.google.com/*"],
+      "js": ["gpt-autorun.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

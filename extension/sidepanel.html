@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 18px 16px 24px; font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; color: #222; }
+  h1 { font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 6px; }
+  .brand { font-size: 11px; font-weight: 900; color: #FF6F0F; letter-spacing: -0.2px; margin-bottom: 8px; }
+  #conn { font-size: 12.5px; font-weight: 900; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; line-height: 1.5; }
+  #conn.off { background: #fff4ec; color: #c25a00; border: 1px solid #ffd9b5; }
+  #conn.on { background: #ecfbf1; color: #0a7b3d; border: 1px solid #bfe8cd; }
+  label { font-size: 12px; font-weight: bold; color: #555; display: block; margin: 12px 0 6px; }
+  select, textarea { width: 100%; border: 1px solid #ddd; border-radius: 10px; padding: 10px; font-size: 13px; font-family: inherit; }
+  textarea { height: 70px; resize: vertical; }
+  button { width: 100%; border: 0; border-radius: 10px; padding: 12px; font-size: 13.5px; font-weight: 900; cursor: pointer; margin-top: 8px; }
+  .primary { background: #16a34a; color: #fff; }
+  .soft { background: #e8f7ee; color: #15803d; border: 1px solid #bfe8cd; }
+  .ghost { background: #f2f2f2; color: #333; }
+  .danger { background: #fff; color: #c00; border: 1px solid #f0c0c0; }
+  #titlePreview { font-size: 12.5px; background: #f7f7f7; border-radius: 10px; padding: 10px 12px; margin-top: 10px; line-height: 1.6; word-break: break-all; }
+  .hidden { display: none; }
+  ol { font-size: 12.5px; color: #444; line-height: 1.8; margin: 6px 0 0; padding-left: 20px; }
+  h2 { font-size: 13px; margin: 18px 0 4px; }
+  hr { border: 0; border-top: 1px solid #eee; margin: 16px 0 0; }
+</style>
+</head>
+<body>
+  <div class="brand">당근 Post AI 자동입력 feat. 양윤석</div>
+  <h1>⚠️ 사이트 연결 · 사용법 안내</h1>
+  <div id="conn" class="off">연결할 화면을 확인해 주세요. 아래에서 사용할 사이트를 선택하면 연결 방법과 사용 순서를 볼 수 있습니다.</div>
+
+  <div id="connectView">
+    <label>어디에 작성하시나요?</label>
+    <select id="site">
+      <option value="daangn">당근 소식 (비즈프로필)</option>
+    </select>
+    <button class="primary" id="openSite">🌐 사이트 열기 (글 만들기)</button>
+    <button class="soft" id="fromClipboard">📋 클립보드에서 가져와 연결</button>
+    <p style="font-size:12px;color:#888;margin:10px 0 0;">사이트에서 글을 만들고 <b>당근에 보내기</b>를 누르면 자동 연결됩니다.</p>
+    <textarea id="payload" placeholder='직접 붙여넣기: {"title": "...", "body": "..."}'></textarea>
+    <button class="ghost" id="save">붙여넣은 내용으로 연결</button>
+  </div>
+
+  <div id="readyView" class="hidden">
+    <div id="titlePreview"></div>
+    <button class="primary" id="copyBoth">📋 제목+본문 복사</button>
+    <button class="ghost" id="copyTitle">저장된 제목 복사</button>
+    <button class="ghost" id="copyBody">저장된 본문 복사</button>
+    <button class="danger" id="disconnect">연결 끊기</button>
+  </div>
+
+  <hr>
+  <h2>① 사이트 연결하기</h2>
+  <ol>
+    <li>위 <b>사이트 열기</b>로 글을 만듭니다.</li>
+    <li><b>당근에 보내기</b>를 눌러 이 패널과 연결합니다.</li>
+    <li>당근 소식 작성 페이지를 엽니다.</li>
+  </ol>
+  <h2>② 연결 후 사용하기</h2>
+  <ol>
+    <li>당근 작성 페이지에서 <b>✦ AI 글 채우기</b>를 누릅니다.</li>
+    <li>제목·본문·이미지가 자동 입력됩니다.</li>
+    <li>등록 버튼만 직접 확인 후 클릭하세요.</li>
+  </ol>
+
+  <script src="sidepanel.js"></script>
+</body>
+</html>
