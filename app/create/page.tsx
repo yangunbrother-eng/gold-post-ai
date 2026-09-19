@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Topbar from "@/components/Topbar";
+import Icon from "@/components/Icon";
 import UiIcon from "@/components/UiIcon";
 import UiDialog from "@/components/UiDialog";
 import PhonePreview from "@/components/PhonePreview";
@@ -198,7 +199,12 @@ function CreateInner() {
       {step === 1 && <section className="ws-panel ws-compose">
         <h2 ref={heading} tabIndex={-1}>어떤 이야기를 전할까요?</h2><p className="ws-helper">주제를 한 줄로 적거나 아래에서 골라 주세요.</p>
         <div className="ws-form-group"><label htmlFor="post-topic" className="ws-label">오늘의 주제</label><textarea id="post-topic" className="ws-input" rows={4} value={input} onChange={(e) => setInput(e.target.value)} placeholder="예) 끊어진 금목걸이도 매입할 수 있다는 안내를 쓰고 싶어요." /></div>
-        <div className="ws-form-group"><span className="ws-label">빠른 주제 선택</span><div className="ws-chips">{QUICK_TOPICS.map((q) => <button key={q} type="button" aria-pressed={quick === q} className={`ws-chip ${quick === q ? "is-active" : ""}`} onClick={() => { setQuick(q); if (!input.trim() && q !== "자유 주제") setInput(q); }}>{q}</button>)}</div></div>
+        <div className="ws-form-group" role="group" aria-labelledby="quick-topic-title">
+          <span id="quick-topic-title" className="ws-label">빠른 주제 선택</span>
+          <div className="ws-chips">{QUICK_TOPICS.map((q) => <button key={q} type="button" aria-pressed={quick === q} className={`ws-chip ${quick === q ? "is-active" : ""}`} onClick={() => { setQuick(q); if (!input.trim() && q !== "자유 주제") setInput(q); }}>{q}</button>)}</div>
+          <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />유튜브에서 주제 찾기<UiIcon name="external" size={16} /></Link>
+          <p id="youtube-topic-help" className="ws-helper">새 탭에서 영상과 댓글을 살펴보세요. 작성 중인 화면은 그대로 남아요.</p>
+        </div>
         <div className="ws-form-group"><span className="ws-label">어떻게 작성할까요?</span><div className="ws-provider-grid">{PROVIDERS.map((p) => <button type="button" key={p.id} aria-pressed={provider === p.id} className={`ws-provider ${provider === p.id ? "is-active" : ""}`} onClick={() => { setProvider(p.id); setShowPaste(false); }}><strong>{p.name}</strong><small>{p.desc}</small></button>)}</div></div>
         <p className="ws-helper ws-form-group">{brand.businessName} · {tone} <Link href="/brand" className="ws-text-link">매장 정보 확인<UiIcon name="chevron" size={13} /></Link></p>
         <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={busy} onClick={() => void generate()}><UiIcon name="spark" />{busy ? "초안을 만들고 있어요…" : provider === "chatgpt" || provider === "gemini" ? `${hostName} 작성 지시문 만들기` : provider === "template" ? "빠른 초안 만들기" : "사이트 AI로 작성하기"}</button>

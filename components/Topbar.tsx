@@ -7,8 +7,7 @@ import Icon, { type IconName } from "@/components/Icon";
 
 const TABS: { href: string; label: string; icon: IconName; ariaLabel?: string }[] = [
   { href: "/", label: "홈", icon: "home" },
-  { href: "/create", label: "만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
-  { href: "/trends", label: "유튜브", icon: "youtube", ariaLabel: "유튜브에서 주제 찾기" },
+  { href: "/create", label: "소식 만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
   { href: "/library", label: "보관함", icon: "folder" },
   { href: "/calendar", label: "캘린더", icon: "calendar" },
 ];
@@ -69,7 +68,7 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
             </Link>
           ))}
           <button ref={trigger} type="button" onClick={() => setOpen(true)} className={`nav-item ${!isPrimary || open ? "is-active" : ""}`} aria-label="전체 메뉴 열기" aria-expanded={open} aria-controls="all-menus" aria-haspopup="dialog">
-            <Icon name="menu" size={20} /><span>전체</span>
+            <Icon name="menu" size={20} /><span>전체 메뉴</span>
           </button>
         </nav>
       </header>

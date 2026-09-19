@@ -41,8 +41,11 @@ export default function Dashboard() {
           <h2 id="compose-title">무슨 글을 쓸지 고민될 때,<br />주제만 골라 시작하세요.</h2>
           <p>글 작성부터 이미지와 게시 준비까지 한곳에서.</p>
           <Link href="/create" className="primary-action"><Icon name="edit" />새 소식 만들기<Icon name="arrow" size={19} /></Link>
-          <Link href="/trends" className="btn-ghost mt-3 flex w-full items-center justify-center gap-2 px-3 py-3 text-[14px] font-bold"><Icon name="youtube" />유튜브에서 주제 찾기<Icon name="arrow" size={17} /></Link>
-          <div className="quick-topics" aria-label="빠른 주제 선택">{TOPICS.map((topic) => <Link key={topic.name} href={createLink(topic.topic)}><Icon name={topic.icon} size={16} /><span>{topic.name}</span></Link>)}</div>
+          <div className="mt-5" role="group" aria-labelledby="home-topic-title">
+            <h3 id="home-topic-title" className="text-[13px] font-bold text-neutral-600">주제 선택</h3>
+            <div className="quick-topics" aria-label="빠른 주제 선택">{TOPICS.map((topic) => <Link key={topic.name} href={createLink(topic.topic)}><Icon name={topic.icon} size={16} /><span>{topic.name}</span></Link>)}</div>
+            <Link href="/trends" className="btn-ghost mt-3 flex w-full items-center justify-center gap-2 px-3 py-3 text-[14px] font-bold"><Icon name="youtube" />유튜브에서 주제 찾기<Icon name="arrow" size={17} /></Link>
+          </div>
         </section>
 
         <section aria-labelledby="work-title" aria-busy={!loaded}>
