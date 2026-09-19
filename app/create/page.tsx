@@ -10,13 +10,13 @@ import PhonePreview from "@/components/PhonePreview";
 import { useBrand, useContents, uid, todayStr } from "@/lib/store";
 import { checkSimilarity, detectType, generatePost, rewritePost, suggestTitles } from "@/lib/ai";
 import { AI_IMAGE_STYLES, buildGptPastePrompt, buildImagePrompt } from "@/lib/ai-image";
-import { type HostAi, buildHostPrompt, openHostAi, splitPasted } from "@/lib/ai-host";
+import { type HostAi, buildHostPrompt, splitPasted } from "@/lib/ai-host";
 import { EDIT_ACTIONS, QUICK_TOPICS } from "@/lib/sample-data";
 import type { ContentStatus, ContentType, GeneratedPost } from "@/lib/types";
 
 const PROVIDERS: { id: HostAi; name: string; desc: string }[] = [
-  { id: "chatgpt", name: "ChatGPT", desc: "새 탭에서 작성 후 가져오기" },
-  { id: "gemini", name: "Gemini", desc: "새 탭에서 작성 후 가져오기" },
+  { id: "chatgpt", name: "ChatGPT", desc: "지시문 복사 후 결과 가져오기" },
+  { id: "gemini", name: "Gemini", desc: "지시문 복사 후 결과 가져오기" },
   { id: "auto", name: "사이트 AI", desc: "연결된 서버 AI로 작성" },
   { id: "template", name: "빠른 초안", desc: "기본 문장으로 바로 시작" },
 ];
@@ -111,7 +111,7 @@ function CreateInner() {
     if (provider === "chatgpt" || provider === "gemini") {
       const prompt = buildHostPrompt(input, brand, tone, detected);
       setHostPrompt(prompt); setShowPaste(true); setError("");
-      await copy(prompt, "작성 지시문을 복사했어요. 아래 버튼으로 AI를 열어 붙여넣어 주세요.");
+      await copy(prompt, `작성 지시문을 복사했어요. ${provider === "gemini" ? "Gemini" : "ChatGPT"}에 붙여넣어 주세요.`);
       return;
     }
     if ((title || body) && !window.confirm("새 초안으로 현재 제목과 본문을 바꿀까요? 필요한 글은 먼저 저장해 주세요.")) return;
@@ -211,7 +211,7 @@ function CreateInner() {
         <button type="button" className="ws-text-link ws-button-wide" onClick={() => move(2)}>AI 없이 직접 작성할게요<UiIcon name="arrow" size={16} /></button>
         {showPaste && (provider === "chatgpt" || provider === "gemini") && <div className="ws-form-group ws-stack">
           <div className="ws-note"><UiIcon name="info" size={18} /><span>① 지시문 복사 → ② {hostName}에 붙여넣고 전송 → ③ 결과를 아래로 가져오세요. 이 사이트가 구독 계정에 직접 접속하는 방식은 아니에요.</span></div>
-          <div className="ws-secondary-actions"><button type="button" className="ws-button" onClick={() => void copy(hostPrompt)}><UiIcon name="copy" size={16} />지시문 복사</button><button type="button" className="ws-button" onClick={() => openHostAi(provider, hostPrompt)}>{hostName} 열기<UiIcon name="external" size={16} /></button></div>
+          <div className="ws-secondary-actions"><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(hostPrompt)}><UiIcon name="copy" size={16} />지시문 복사</button></div>
           <details className="ws-disclosure"><summary>복사가 안 되나요? 지시문 직접 보기</summary><textarea className="ws-input" value={hostPrompt} readOnly rows={6} aria-label="직접 복사할 작성 지시문" /></details>
           <label className="ws-label" htmlFor="pasted-result">작성 결과 붙여넣기</label><textarea id="pasted-result" className="ws-input" rows={6} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder={"제목: …\n본문:\n…"} />
           <div className="ws-secondary-actions"><button className="ws-button" type="button" onClick={() => void paste()}>클립보드에서 가져오기</button><button className="ws-button ws-button-primary" type="button" onClick={() => applyPasted()}>입력한 글 적용<UiIcon name="arrow" size={16} /></button></div>
