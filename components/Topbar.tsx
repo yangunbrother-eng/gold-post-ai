@@ -44,7 +44,7 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
   return (
     <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: "rgba(250,246,238,0.95)", borderColor: "#E7DCC4" }}>
       {/* 1열: 브랜드 로고 + 지점 표시 + 햄버거 버튼 */}
-      <div className="px-5 lg:px-8 py-2.5 flex items-center justify-between gap-2">
+      <div className="px-4 py-2.5 flex items-center justify-between gap-2">
         <Link href="/" className="flex items-center gap-2 min-w-0">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: "linear-gradient(135deg,#C9A227,#8a6a24)" }}>
             🥕
@@ -74,7 +74,7 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
       </div>
 
       {/* 2열: 부드러운 가로 스크롤 탭 메뉴 */}
-      <nav className="px-4 lg:px-8 py-1 flex gap-0.5 overflow-x-auto no-scrollbar border-t text-[11.5px] font-semibold" style={{ borderColor: "#EFE6D2", background: "rgba(243,233,210,0.5)" }}>
+      <nav className="px-4 py-1 flex gap-0.5 overflow-x-auto no-scrollbar border-t text-[11.5px] font-semibold" style={{ borderColor: "#EFE6D2", background: "rgba(243,233,210,0.5)" }}>
         {QUICK_TABS.map((t) => {
           const active = path === t.href;
           return (
@@ -94,8 +94,8 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
 
       {/* 3열: 페이지 타이틀 (지정된 경우에만 표시) */}
       {title && (
-        <div className="px-5 lg:px-8 py-2.5 border-t border-neutral-100 bg-white">
-          <div className="text-[17px] font-extrabold tracking-tight">{title}</div>
+        <div className="px-4 py-2.5 border-t border-neutral-100 bg-white">
+          <div className="text-[16px] font-extrabold tracking-tight">{title}</div>
           {sub && <div className="text-[12px] text-neutral-400 mt-0.5">{sub}</div>}
         </div>
       )}
@@ -107,7 +107,7 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
           onClick={() => setDrawerOpen(false)}
         >
           <div
-            className="w-[290px] h-full bg-white shadow-2xl flex flex-col p-5 overflow-y-auto"
+            className="w-[min(320px,88vw)] h-full bg-white shadow-2xl flex flex-col p-5 overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
