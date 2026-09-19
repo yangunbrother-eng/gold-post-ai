@@ -26,6 +26,7 @@ const TONES = ["친근한 상담형", "전문가형", "정보 전달형", "지�
 const LENGTHS = ["짧게", "보통", "자세히"];
 const SOURCES = [
   { id: "direct", label: "직접 주제 입력" },
+  { id: "naver", label: "네이버에서 찾기" },
   { id: "youtube", label: "유튜브에서 찾기" },
   { id: "image", label: "이미지 예시 참고" },
 ] as const;
@@ -75,10 +76,15 @@ function CreateInner() {
   const [payloadBusy, setPayloadBusy] = useState(false);
   const [toneSel, setToneSel] = useState("");
   const [lenSel, setLenSel] = useState("보통");
-  const [sourceTab, setSourceTab] = useState<"direct" | "youtube" | "image">("direct");
+  const [sourceTab, setSourceTab] = useState<"direct" | "naver" | "youtube" | "image">("direct");
   const [postType, setPostType] = useState<ContentType | "">("");
   const [ytKw, setYtKw] = useState("");
   const [ytText, setYtText] = useState("");
+  const [naverKws, setNaverKws] = useState("");
+  const [naverResults, setNaverResults] = useState<{ title: string; link: string; blogger: string; description: string; postdate: string; kw: string }[]>([]);
+  const [naverChecked, setNaverChecked] = useState<number[]>([]);
+  const [naverLoading, setNaverLoading] = useState(false);
+  const [naverErr, setNaverErr] = useState("");
   const [refCount, setRefCount] = useState("5개");
   const [extra, setExtra] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -97,7 +103,8 @@ function CreateInner() {
   const detected: ContentType = postType || (TYPE_MAP[quick] && quick !== "자유 주제" ? TYPE_MAP[quick] : detectType(input || title));
   const similarity = useMemo(() => body ? checkSimilarity(body, items.filter(i => i.id !== savedId).slice(0, 8)) : 0, [body, items, savedId]);
   const say = (message: string) => { setToast(message); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 4200); };
-  const move = (next: number) => { if (busy || imageBusy) return; setStep(next); setError(""); requestAnimationFrame(() => main.current?.focus()); window.scrollTo({ top: 0, behavior: "auto" }); };
+  const SECS = ["sec-topic", "sec-draft", "sec-images", "sec-publish"];
+  const go = (section: string, highlight: number) => { if (busy || imageBusy) return; setStep(highlight); setError(""); requestAnimationFrame(() => { document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }); }); };
   const snapshot = stamp(title, body, tags, studio);
   const dirty = !!(title || body || images.length) && snapshot !== savedStamp;
   const ready = !!title.trim() && !!body.trim();
@@ -129,7 +136,10 @@ function CreateInner() {
       if (t) setSourceTab("direct");
       setInput(t); setTitle(""); setBody(""); setTags([]); setPost(null);
       setSavedId(null); setSavedStamp(""); setStudio(newImageDraft()); setShowPaste(false);
-      setStep(params.get("section") === "images" || window.location.hash === "#images" ? 3 : 1); return;
+      const sec = params.get("section") === "images" || window.location.hash === "#images" ? 3 : 1;
+      setStep(sec);
+      setTimeout(() => document.getElementById(sec === 3 ? "sec-images" : "sec-topic")?.scrollIntoView(), 400);
+      return;
     }
     const item = items.find(i => i.id === id) as StudioContent | undefined;
     if (!item) { setError("이 글을 이 브라우저에서 찾지 못했어요. 보관함에서 다시 선택해 주세요."); return; }
@@ -138,7 +148,9 @@ function CreateInner() {
     setTitle(item.title); setBody(item.body); setTags(hashtags); setPost(item); setInput(item.title); setStudio(draft); setPlanDate(item.date);
     setSavedId(params.get("reuse") ? null : item.id);
     setSavedStamp(params.get("reuse") ? "" : stamp(item.title, item.body, hashtags, draft));
-    setStep(params.get("section") === "images" ? 3 : 2);
+    const reSec = params.get("section") === "images" ? 3 : 2;
+    setStep(reSec);
+    setTimeout(() => document.getElementById(reSec === 3 ? "sec-images" : "sec-draft")?.scrollIntoView(), 400);
   }, [loaded, params, items]);
   const copy = async (text: string, message = "복사했어요.") => {
     try { await navigator.clipboard.writeText(text); say(message); return true; }
@@ -146,7 +158,7 @@ function CreateInner() {
   };
   const applyPost = (value: GeneratedPost) => {
     setPost(value); setTitle(value.title); setBody(value.body); setTags(value.hashtags?.length ? value.hashtags : readTags(value.body)); setAltTitles([]); setError("");
-    setStep(2); requestAnimationFrame(() => main.current?.focus()); window.scrollTo({ top: 0 });
+    go("sec-draft", 2);
   };
   const basePost = (): GeneratedPost => ({ title, body, hook: post?.hook ?? body.split("\n")[0] ?? "", coreMessage: post?.coreMessage ?? "", cta: post?.cta ?? brand.defaultCta, imageCopy: post?.imageCopy ?? title.slice(0, 14), imageSubCopy: post?.imageSubCopy ?? brand.businessName, hashtags: tags, type: post?.type ?? detected });
   const generate = async () => {
@@ -188,8 +200,42 @@ function CreateInner() {
     setShowPaste(false); log("외부 작성 결과 적용됨"); say("가져온 글을 적용했어요.");
   };
   const paste = async () => { try { const text = await navigator.clipboard.readText(); setPasted(text); applyPasted(text); } catch { setError("클립보드를 읽을 수 없어요. 아래 입력칸에 직접 붙여넣어 주세요."); } };
+  const searchNaver = async () => {
+    const kws = naverKws.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
+    if (!kws.length) { setError("네이버 검색 키워드를 쉼표로 구분해 입력해 주세요. (예: 금니 매입, 돌반지 가격)"); return; }
+    const n = parseInt(refCount) || 5;
+    setNaverLoading(true); setNaverErr(""); setNaverResults([]); setNaverChecked([]);
+    log(`네이버 자동 검색 시작 (${kws.join(", ")})`);
+    try {
+      const all: { title: string; link: string; blogger: string; description: string; postdate: string; kw: string }[] = [];
+      for (const kw of kws) {
+        const r = await fetch(`/api/naver-search?query=${encodeURIComponent(kw)}&display=${n}`);
+        const j = await r.json();
+        if (j.error === "no_key") { setNaverErr("no_key"); log("네이버 키 미등록"); return; }
+        if (j.error || !Array.isArray(j.items)) throw new Error("failed");
+        (j.items as { title: string; link: string; blogger: string; description: string; postdate: string }[]).forEach(it => all.push({ ...it, kw }));
+      }
+      const merged = all.slice(0, 12);
+      setNaverResults(merged);
+      setNaverChecked(merged.map((_, i) => i).slice(0, n));
+      log(`네이버 검색 완료 (${merged.length}건)`);
+      if (!merged.length) setError("검색 결과가 없어요. 키워드를 바꿔 보세요.");
+    } catch {
+      setNaverErr("failed"); log("네이버 검색 실패");
+    } finally { setNaverLoading(false); }
+  };
+  const applyNaver = () => {
+    const picked = naverChecked.map(i => naverResults[i]).filter(Boolean);
+    if (!picked.length) { setError("참고할 글을 1개 이상 고르세요."); return; }
+    const base = naverKws.split(",")[0]?.trim() || input.trim();
+    const dump = picked.map(p => `■ ${p.title} (${p.blogger})\n${p.description}\n원문: ${p.link}`).join("\n\n");
+    setInput(`${base}\n\n[참고 자료]\n${dump}`);
+    setProvider("auto");
+    log(`네이버 참고글 ${picked.length}개로 주제 만들기`);
+    say("참고 자료를 넣었어요. 아래 생성 버튼을 눌러주세요.");
+  };
   const edit = (id: string) => {
-    if (id === "regen") { move(1); say("주제와 작성 방식을 확인한 뒤 새로 작성해 주세요."); return; }
+    if (id === "regen") { go("sec-topic", 1); say("주제와 작성 방식을 확인한 뒤 새로 작성해 주세요."); return; }
     if (id === "titles") { setAltTitles(suggestTitles(basePost())); return; }
     const next = rewritePost(basePost(), id, brand); setPost(next); setTitle(next.title); setBody(next.body); setTags(next.hashtags); say("문장을 다듬었어요.");
   };
@@ -227,17 +273,28 @@ function CreateInner() {
     } finally { setPayloadBusy(false); }
   };
   const hostName = provider === "gemini" ? "Gemini" : "ChatGPT";
-  return <div className="ws-app"><Topbar title="소식 작성하기" sub="주제부터 이미지까지, 우리 매장 소식을 한 단계씩 완성해요." />
+  return <div className="ws-app"><Topbar title="소식 작성하기" sub="주제·초안·이미지·발행을 한 화면에서 완성해요." />
     <main className="ws-main" ref={main} tabIndex={-1} id="main-content">
-      <nav className="ws-stepper" style={{ gridTemplateColumns: "repeat(4,minmax(0,1fr))" }} aria-label="소식 작성 단계">{["주제", "초안", "이미지", "발행"].map((label, i) => <button type="button" key={label} className={`ws-step ${step === i + 1 ? "is-active" : ""} ${step > i + 1 ? "is-done" : ""}`} aria-current={step === i + 1 ? "step" : undefined} disabled={busy || imageBusy || (i === 3 && !ready)} onClick={() => move(i + 1)}><span>{i + 1}</span>{label}</button>)}</nav>
+      <nav className="ws-stepper" style={{ gridTemplateColumns: "repeat(4,minmax(0,1fr))" }} aria-label="소식 작성 단계">{["주제", "초안", "이미지", "발행"].map((label, i) => <button type="button" key={label} className={`ws-step ${step === i + 1 ? "is-active" : ""} ${step > i + 1 ? "is-done" : ""}`} aria-current={step === i + 1 ? "step" : undefined} disabled={busy || imageBusy || (i === 3 && !ready)} onClick={() => go(SECS[i], i + 1)}><span>{i + 1}</span>{label}</button>)}</nav>
       {error && <div className="ws-note ws-note-error" role="alert"><UiIcon name="info" size={18} />{error}</div>}
-      {step === 1 && <section className="ws-panel ws-compose">
+      <section id="sec-topic" className="ws-panel ws-compose">
         <h2>어떤 이야기를 전할까요?</h2><p className="ws-helper">찾는 방식과 글 유형을 고르면 초안이 그에 맞게 만들어져요.</p>
         <div className="ws-form-group" role="group" aria-label="초안 찾기 방식"><span className="ws-label">초안 찾기 방식</span><div className="ws-chips">{SOURCES.map(s => <button key={s.id} type="button" aria-pressed={sourceTab === s.id} className={`ws-chip ${sourceTab === s.id ? "is-active" : ""}`} onClick={() => setSourceTab(s.id)}>{s.label}</button>)}</div></div>
         {sourceTab === "direct" && <>
           <div className="ws-form-group"><label htmlFor="post-topic" className="ws-label">오늘의 주제</label><textarea id="post-topic" className="ws-input" rows={4} value={input} onChange={e => setInput(e.target.value)} placeholder="예) 끊어진 금목걸이도 매입할 수 있다는 안내를 쓰고 싶어요." /></div>
           <div className="ws-form-group" role="group" aria-labelledby="quick-topic-title"><span id="quick-topic-title" className="ws-label">빠른 주제 선택</span><div className="ws-chips">{QUICK_TOPICS.map(q => <button key={q} type="button" aria-pressed={quick === q} className={`ws-chip ${quick === q ? "is-active" : ""}`} onClick={() => { setQuick(q); if (!input.trim() && q !== "자유 주제") setInput(q); }}>{q}</button>)}</div></div>
         </>}
+        {sourceTab === "naver" && <div className="ws-form-group ws-stack">
+          <span className="ws-label">네이버에서 찾기</span>
+          <p className="ws-helper">관련 키워드를 쉼표로 여러 개 입력하면 자동으로 검색해서 참고 글을 모아줍니다. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
+          <div className="ws-secondary-actions"><input className="ws-input" value={naverKws} onChange={e => setNaverKws(e.target.value)} placeholder="검색 키워드 (예: 금니 매입, 돌반지 가격)" aria-label="네이버 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label><button type="button" className="ws-button ws-button-primary" disabled={naverLoading} onClick={() => void searchNaver()}>{naverLoading ? "검색 중…" : "자동으로 검색하기"}</button></div>
+          {naverErr === "no_key" && <div className="ws-note"><UiIcon name="info" size={17} />네이버 키가 아직 없어서 자동 검색이 안 돼요. 발급받는 법: developers.naver.com → 내 애플리케이션 → 검색 API 체크 → 나온 ID·키를 알려주세요. 서버에 등록하면 바로 켜집니다.</div>}
+          {naverErr === "failed" && <div className="ws-note ws-note-error">검색에 실패했어요. 잠시 후 다시 시도해 주세요.</div>}
+          {naverResults.length > 0 && <div role="group" aria-label="검색 결과 선택">
+            {naverResults.map((r, i) => <label key={`${r.link}${i}`} className="ws-checklist" style={{ display: "flex", gap: 8, marginBottom: 8 }}><input type="checkbox" checked={naverChecked.includes(i)} onChange={e => setNaverChecked(prev => e.target.checked ? [...prev, i] : prev.filter(x => x !== i))} style={{ marginTop: 4 }} /><span><strong>{r.title}</strong><br /><span style={{ fontSize: 12, opacity: 0.7 }}>{r.blogger} · #{r.kw}</span><br /><span style={{ fontSize: 13 }}>{r.description.slice(0, 90)}{r.description.length > 90 ? "…" : ""}</span></span></label>)}
+            <button type="button" className="ws-button ws-button-primary" onClick={applyNaver}>선택한 {naverChecked.length}개로 주제 만들기<UiIcon name="arrow" size={16} /></button>
+          </div>}
+        </div>}
         {sourceTab === "youtube" && <div className="ws-form-group ws-stack">
           <span className="ws-label">유튜브에서 찾기</span>
           <p className="ws-helper">키워드로 유튜브 검색을 열고, 영상 설명이나 댓글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
@@ -258,19 +315,18 @@ function CreateInner() {
         </div>
         <p className="ws-helper ws-form-group">{brand.businessName} · {tone} <Link href="/brand" className="ws-text-link">매장 정보 확인<UiIcon name="chevron" size={13} /></Link></p>
         <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={busy} onClick={() => void generate()}><UiIcon name="spark" />{busy ? "초안을 만들고 있어요…" : provider === "chatgpt" || provider === "gemini" ? `${hostName} 작성 지시문 만들기` : provider === "template" ? "빠른 초안 만들기" : "사이트 AI로 작성하기"}</button>
-        <button type="button" className="ws-text-link ws-button-wide" onClick={() => move(2)}>AI 없이 직접 작성할게요<UiIcon name="arrow" size={16} /></button>
+        <button type="button" className="ws-text-link ws-button-wide" onClick={() => go("sec-draft", 2)}>AI 없이 직접 작성할게요<UiIcon name="arrow" size={16} /></button>
         {showPaste && (provider === "chatgpt" || provider === "gemini") && <div className="ws-form-group ws-stack"><div className="ws-note"><UiIcon name="info" size={18} /><span>{hostName}에서 작성이 끝나면 결과를 복사해 아래로 가져오세요. 자동 입력·전송은 연결된 확장프로그램이 담당해요.</span></div><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(hostPrompt)}><UiIcon name="copy" size={16} />지시문 다시 복사</button><details className="ws-disclosure"><summary>복사가 안 되나요? 지시문 직접 보기</summary><textarea className="ws-input" value={hostPrompt} readOnly rows={6} aria-label="직접 복사할 작성 지시문" /></details><label className="ws-label" htmlFor="pasted-result">작성 결과 붙여넣기</label><textarea id="pasted-result" className="ws-input" rows={6} value={pasted} onChange={e => setPasted(e.target.value)} placeholder={"제목: …\n본문:\n…"} /><div className="ws-secondary-actions"><button className="ws-button" type="button" onClick={() => void paste()}>클립보드에서 가져오기</button><button className="ws-button ws-button-primary" type="button" onClick={() => applyPasted()}>입력한 글 적용<UiIcon name="arrow" size={16} /></button></div></div>}
-      </section>}
-      {step === 2 && <>
-        <section className="ws-panel ws-compose"><h2>우리 매장답게 다듬어 주세요.</h2><p className="ws-helper">수정한 초안이 다음 단계 이미지에 반영돼요.</p><div className="ws-form-group"><div className="ws-form-heading"><label className="ws-label" htmlFor="post-title">소식 제목</label><span>{title.length}자</span></div><input id="post-title" className="ws-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="고객의 관심을 끄는 제목" /></div><div className="ws-form-group"><div className="ws-form-heading"><label className="ws-label" htmlFor="post-body">소식 본문</label><span>{body.length.toLocaleString()}자</span></div><textarea id="post-body" className="ws-input" rows={12} value={body} onChange={e => setBody(e.target.value)} placeholder="고객에게 전하고 싶은 이야기를 적어 주세요." /></div>
+      </section>
+      <section id="sec-draft" className="ws-panel ws-compose"><h2>우리 매장답게 다듬어 주세요.</h2><p className="ws-helper">수정한 초안이 다음 단계 이미지에 반영돼요.</p><div className="ws-form-group"><div className="ws-form-heading"><label className="ws-label" htmlFor="post-title">소식 제목</label><span>{title.length}자</span></div><input id="post-title" className="ws-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="고객의 관심을 끄는 제목" /></div><div className="ws-form-group"><div className="ws-form-heading"><label className="ws-label" htmlFor="post-body">소식 본문</label><span>{body.length.toLocaleString()}자</span></div><textarea id="post-body" className="ws-input" rows={12} value={body} onChange={e => setBody(e.target.value)} placeholder="고객에게 전하고 싶은 이야기를 적어 주세요." /></div>
           <div className="ws-form-group"><label htmlFor="post-tags" className="ws-label">해시태그</label><input id="post-tags" className="ws-input" value={tags.join(" ")} onChange={e => setTags(e.target.value.split(" "))} onBlur={() => setTags(previous => Array.from(new Set(previous.filter(Boolean).map(t => t.startsWith("#") ? t : `#${t}`))))} placeholder="#금박사 #제주금매입" /></div>
           {similarity >= 55 && <div className="ws-note ws-form-group"><UiIcon name="info" size={17} />최근 글과 문장이 비슷해요. 반복되는 표현을 확인해 주세요.</div>}
           <details className="ws-disclosure"><summary>문장 다듬기 · 다른 제목 제안</summary><div className="ws-chips">{EDIT_ACTIONS.map(a => <button className="ws-chip" type="button" key={a.id} disabled={!body.trim()} onClick={() => edit(a.id)}>{a.label}</button>)}</div>{altTitles.map(t => <button type="button" key={t} className="ws-button ws-button-wide ws-form-group" onClick={() => { setTitle(t); setAltTitles([]); }}>{t}</button>)}</details><div className="ws-editor-actions"><button className="ws-button" type="button" onClick={() => save("초안")}><UiIcon name="library" size={16} />초안 저장</button><button className="ws-button" type="button" disabled={!body.trim()} onClick={() => void copy(exportText())}><UiIcon name="copy" size={16} />글 복사</button></div></section>
-        <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={!ready} onClick={() => move(3)}>이 초안으로 이미지 준비하기<UiIcon name="arrow" /></button><button type="button" className="ws-text-link ws-button-wide" disabled={!ready} onClick={() => move(4)}>이미지 없이 발행 준비</button>
-      </>}
-      <div hidden={step !== 3} id="images"><ImageStudio title={title} body={body} hashtags={tags} draft={studio} onChange={setStudio} onEdit={() => move(2)} onBusyChange={setImageBusy} />
-        <div className="ws-editor-actions ws-form-group"><button type="button" className="ws-button" disabled={imageBusy} onClick={() => save("초안")}>글·이미지 저장</button><button type="button" className="ws-button ws-button-primary" disabled={!ready || imageBusy} onClick={() => move(4)}>발행 준비<UiIcon name="arrow" size={16} /></button></div><p className="ws-helper ws-form-group">이미지 없이 넘어가도 괜찮아요. 저장해야 보관함에서 이어 쓸 수 있어요.</p></div>
-      {step === 4 && <><section className="ws-panel ws-compose"><h2>발행 전에 한 번 확인해 주세요.</h2><p className="ws-helper">실제 당근 화면과 다를 수 있는 미리보기예요.</p><div className="ws-preview ws-form-group"><PhonePreview title={title} body={exportText().slice(title.length).trim()} bizName={brand.businessName} time="미리보기" imageCopy="" imageSub="" bg={brand.color} logo={brand.logoUrl} logoText={brand.logoText} aiImages={images} /></div><div className="ws-checklist"><label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /><span>시세·거래 사례·연락처를 확인했어요. 생성한 이미지를 실제 매장·고객 사진으로 오해하게 쓰지 않아요.</span></label></div><div className="ws-editor-actions"><button type="button" className="ws-button" onClick={() => move(2)}>글 수정</button><button type="button" className="ws-button" onClick={() => move(3)}>이미지 수정</button><button type="button" className="ws-button" disabled={!checked} onClick={() => save("검수 완료")}>검수 완료로 저장</button></div><button type="button" className="ws-button ws-button-primary ws-button-wide ws-form-group" disabled={!checked || payloadBusy} onClick={() => void openSend()}>당근 발행 준비<UiIcon name="external" size={17} /></button><p className="ws-helper ws-form-group">실제 발행은 당근에서 내용을 확인하고 등록해야 완료돼요.</p></section><section className="ws-panel"><label htmlFor="plan-date" className="ws-label">나중에 올릴 예정인가요?</label><p className="ws-helper">자동 발행이 아니라 캘린더에 예정일을 기록해요.</p><div className="ws-secondary-actions ws-form-group"><input className="ws-input" id="plan-date" type="date" value={planDate} min={todayStr()} onChange={e => setPlanDate(e.target.value)} /><button type="button" className="ws-button" disabled={!checked || !planDate || planDate < todayStr()} onClick={() => save("발행 예정")}>발행 예정일 저장</button></div></section></>}
+        <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={!ready} onClick={() => go("sec-images", 3)}>이 초안으로 이미지 준비하기<UiIcon name="arrow" /></button><button type="button" className="ws-text-link ws-button-wide" disabled={!ready} onClick={() => go("sec-publish", 4)}>이미지 없이 발행 준비</button>
+      </section>
+      <div id="sec-images"><ImageStudio title={title} body={body} hashtags={tags} draft={studio} onChange={setStudio} onEdit={() => go("sec-draft", 2)} onBusyChange={setImageBusy} />
+        <div className="ws-editor-actions ws-form-group"><button type="button" className="ws-button" disabled={imageBusy} onClick={() => save("초안")}>글·이미지 저장</button><button type="button" className="ws-button ws-button-primary" disabled={!ready || imageBusy} onClick={() => go("sec-publish", 4)}>발행 준비<UiIcon name="arrow" size={16} /></button></div><p className="ws-helper ws-form-group">이미지 없이 넘어가도 괜찮아요. 저장해야 보관함에서 이어 쓸 수 있어요.</p></div>
+      <div id="sec-publish"><section className="ws-panel ws-compose"><h2>발행 전에 한 번 확인해 주세요.</h2><p className="ws-helper">실제 당근 화면과 다를 수 있는 미리보기예요.</p><div className="ws-preview ws-form-group"><PhonePreview title={title} body={exportText().slice(title.length).trim()} bizName={brand.businessName} time="미리보기" imageCopy="" imageSub="" bg={brand.color} logo={brand.logoUrl} logoText={brand.logoText} aiImages={images} /></div><div className="ws-checklist"><label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /><span>시세·거래 사례·연락처를 확인했어요. 생성한 이미지를 실제 매장·고객 사진으로 오해하게 쓰지 않아요.</span></label></div><div className="ws-editor-actions"><button type="button" className="ws-button" onClick={() => go("sec-draft", 2)}>글 수정</button><button type="button" className="ws-button" onClick={() => go("sec-images", 3)}>이미지 수정</button><button type="button" className="ws-button" disabled={!checked} onClick={() => save("검수 완료")}>검수 완료로 저장</button></div><button type="button" className="ws-button ws-button-primary ws-button-wide ws-form-group" disabled={!checked || payloadBusy} onClick={() => void openSend()}>당근 발행 준비<UiIcon name="external" size={17} /></button><p className="ws-helper ws-form-group">실제 발행은 당근에서 내용을 확인하고 등록해야 완료돼요.</p></section><section className="ws-panel"><label htmlFor="plan-date" className="ws-label">나중에 올릴 예정인가요?</label><p className="ws-helper">자동 발행이 아니라 캘린더에 예정일을 기록해요.</p><div className="ws-secondary-actions ws-form-group"><input className="ws-input" id="plan-date" type="date" value={planDate} min={todayStr()} onChange={e => setPlanDate(e.target.value)} /><button type="button" className="ws-button" disabled={!checked || !planDate || planDate < todayStr()} onClick={() => save("발행 예정")}>발행 예정일 저장</button></div></section></div>
       <details className="ws-disclosure ws-form-group"><summary>실행 로그{logs.length ? ` (${logs.length})` : ""}</summary><div className="ws-note" style={{ whiteSpace: "pre-wrap", maxHeight: 180, overflow: "auto" }}>{logs.length ? logs.join("\n") : "아직 기록이 없어요. 글을 만들거나 저장하면 여기에 남습니다."}</div><button type="button" className="ws-button ws-button-wide" disabled={!logs.length} onClick={() => void copy(logs.join("\n"), "로그를 복사했어요.")}>로그 복사</button></details>
     </main>
     <UiDialog open={sendOpen} title="당근 발행 준비" onClose={() => setSendOpen(false)}><div className="ws-note"><UiIcon name="info" size={18} />복사해도 글이 자동 발행되지는 않아요.</div><div><h3 className="ws-label">1. 글을 복사하세요</h3><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(exportText(), "제목·본문·해시태그를 복사했어요.")}>글 전체 복사</button></div><div><h3 className="ws-label">2. 이미지를 준비하세요</h3><div className="ws-secondary-actions">{images.map((url, i) => <a key={i} href={url} download={`post-image-${i + 1}.jpg`} className="ws-button">이미지 {i + 1} 저장</a>)}</div></div><div><h3 className="ws-label">3. 당근에서 붙여넣고 등록하세요</h3><a href="https://www.daangn.com/kr/business" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-primary ws-button-wide">당근 비즈니스 열기<UiIcon name="external" size={17} /></a><p className="ws-helper ws-form-group">이미지를 첨부하고 등록 전 최종 확인해 주세요.</p></div><details className="ws-disclosure"><summary>고급 · PC 확장 프로그램으로 전달</summary><p className="ws-helper">연결된 Chrome 확장 프로그램에서 ‘AI 글 채우기’를 누르세요. 실제 첨부·발행 여부는 직접 확인해야 해요.</p><button type="button" className="ws-button ws-button-wide ws-form-group" disabled={payloadBusy || !payload} onClick={() => { log("확장 프로그램용 데이터 복사"); void copy(payload, "확장 프로그램용 데이터를 복사했어요."); }}>{payloadBusy ? "이미지 데이터 준비 중…" : "확장 프로그램용 데이터 복사"}</button><p className="ws-helper">{images.length}장 포함</p></details></UiDialog>
