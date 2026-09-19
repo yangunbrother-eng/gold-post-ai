@@ -5,15 +5,16 @@ import { usePathname } from "next/navigation";
 import { useBrand } from "@/lib/store";
 import Icon, { type IconName } from "@/components/Icon";
 
-const TABS: { href: string; label: string; icon: IconName }[] = [
+const TABS: { href: string; label: string; icon: IconName; ariaLabel?: string }[] = [
   { href: "/", label: "홈", icon: "home" },
-  { href: "/create", label: "소식 만들기", icon: "sparkles" },
+  { href: "/create", label: "만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
+  { href: "/trends", label: "유튜브", icon: "youtube", ariaLabel: "유튜브에서 주제 찾기" },
   { href: "/library", label: "보관함", icon: "folder" },
   { href: "/calendar", label: "캘린더", icon: "calendar" },
 ];
 const MENUS: { href: string; label: string; desc: string; icon: IconName }[] = [
   { href: "/recommend", label: "추천 주제", desc: "다음 글의 아이디어 찾기", icon: "sparkles" },
-  { href: "/trends", label: "인기 주제 찾기", desc: "YouTube 콘텐츠 살펴보기", icon: "trend" },
+  { href: "/trends", label: "유튜브에서 주제 찾기", desc: "영상 검색 · 제목과 댓글 분석", icon: "youtube" },
   { href: "/create#images", label: "소식 이미지", desc: "작성한 글에 이미지 더하기", icon: "image" },
   { href: "/templates", label: "템플릿", desc: "자주 쓰는 글 형식", icon: "copy" },
   { href: "/history", label: "발행 이력", desc: "지난 소식 확인하기", icon: "clock" },
@@ -61,14 +62,14 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
             <Icon name="store" size={15} /><span>{brand.businessName || "내 비즈니스"}</span>
           </Link>
         </div>
-        <nav className="shell primary-nav" aria-label="주요 메뉴">
+        <nav className="shell primary-nav" aria-label="주요 메뉴" style={{ gridTemplateColumns: `repeat(${TABS.length + 1}, minmax(0, 1fr))` }}>
           {TABS.map((tab) => (
-            <Link key={tab.href} href={tab.href} className={`nav-item ${path === tab.href ? "is-active" : ""}`} aria-current={path === tab.href ? "page" : undefined}>
+            <Link key={tab.href} href={tab.href} className={`nav-item ${path === tab.href ? "is-active" : ""}`} aria-label={tab.ariaLabel || tab.label} aria-current={path === tab.href ? "page" : undefined}>
               <Icon name={tab.icon} size={20} /><span>{tab.label}</span>
             </Link>
           ))}
-          <button ref={trigger} type="button" onClick={() => setOpen(true)} className={`nav-item ${!isPrimary || open ? "is-active" : ""}`} aria-expanded={open} aria-controls="all-menus" aria-haspopup="dialog">
-            <Icon name="menu" size={20} /><span>전체 메뉴</span>
+          <button ref={trigger} type="button" onClick={() => setOpen(true)} className={`nav-item ${!isPrimary || open ? "is-active" : ""}`} aria-label="전체 메뉴 열기" aria-expanded={open} aria-controls="all-menus" aria-haspopup="dialog">
+            <Icon name="menu" size={20} /><span>전체</span>
           </button>
         </nav>
       </header>
