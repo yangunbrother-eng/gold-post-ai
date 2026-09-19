@@ -26,7 +26,6 @@ const TONES = ["친근한 상담형", "전문가형", "정보 전달형", "지�
 const LENGTHS = ["짧게", "보통", "자세히"];
 const SOURCES = [
   { id: "direct", label: "직접 주제 입력" },
-  { id: "naver", label: "네이버에서 찾기" },
   { id: "youtube", label: "유튜브에서 찾기" },
   { id: "image", label: "이미지 예시 참고" },
 ] as const;
@@ -76,10 +75,10 @@ function CreateInner() {
   const [payloadBusy, setPayloadBusy] = useState(false);
   const [toneSel, setToneSel] = useState("");
   const [lenSel, setLenSel] = useState("보통");
-  const [sourceTab, setSourceTab] = useState<"direct" | "naver" | "youtube" | "image">("direct");
+  const [sourceTab, setSourceTab] = useState<"direct" | "youtube" | "image">("direct");
   const [postType, setPostType] = useState<ContentType | "">("");
-  const [naverKw, setNaverKw] = useState("");
-  const [naverText, setNaverText] = useState("");
+  const [ytKw, setYtKw] = useState("");
+  const [ytText, setYtText] = useState("");
   const [refCount, setRefCount] = useState("5개");
   const [extra, setExtra] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
@@ -239,16 +238,15 @@ function CreateInner() {
           <div className="ws-form-group"><label htmlFor="post-topic" className="ws-label">오늘의 주제</label><textarea id="post-topic" className="ws-input" rows={4} value={input} onChange={e => setInput(e.target.value)} placeholder="예) 끊어진 금목걸이도 매입할 수 있다는 안내를 쓰고 싶어요." /></div>
           <div className="ws-form-group" role="group" aria-labelledby="quick-topic-title"><span id="quick-topic-title" className="ws-label">빠른 주제 선택</span><div className="ws-chips">{QUICK_TOPICS.map(q => <button key={q} type="button" aria-pressed={quick === q} className={`ws-chip ${quick === q ? "is-active" : ""}`} onClick={() => { setQuick(q); if (!input.trim() && q !== "자유 주제") setInput(q); }}>{q}</button>)}</div></div>
         </>}
-        {sourceTab === "naver" && <div className="ws-form-group ws-stack">
-          <span className="ws-label">네이버에서 찾기</span>
-          <p className="ws-helper">키워드로 네이버 검색을 열고, 참고할 글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
-          <div className="ws-secondary-actions"><input className="ws-input" value={naverKw} onChange={e => setNaverKw(e.target.value)} placeholder="검색 키워드 (예: 금니 매입)" aria-label="네이버 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label><button type="button" className="ws-button" onClick={() => window.open(`https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(naverKw.trim() || input.trim() || "금매입")}`, "_blank", "noopener")}>네이버 검색 열기<UiIcon name="external" size={16} /></button></div>
-          <label className="ws-label" htmlFor="naver-paste">참고 글 붙여넣기 (최대 {refCount}까지 이어 붙이기)</label>
-          <textarea id="naver-paste" className="ws-input" rows={5} value={naverText} onChange={e => setNaverText(e.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." />
-          <button type="button" className="ws-button ws-button-primary" disabled={!naverText.trim()} onClick={() => { const found = (naverText.match(/제목:/g) || []).length; log(found > 1 ? `네이버 참고글 ${found}개 중 첫 번째 적용` : "네이버 참고글 적용"); applyPasted(naverText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
+        {sourceTab === "youtube" && <div className="ws-form-group ws-stack">
+          <span className="ws-label">유튜브에서 찾기</span>
+          <p className="ws-helper">키워드로 유튜브 검색을 열고, 영상 설명이나 댓글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
+          <div className="ws-secondary-actions"><input className="ws-input" value={ytKw} onChange={e => setYtKw(e.target.value)} placeholder="검색 키워드 (예: 금니 매입)" aria-label="유튜브 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label><button type="button" className="ws-button" onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(ytKw.trim() || input.trim() || "금매입")}`, "_blank", "noopener")}>유튜브 검색 열기<UiIcon name="external" size={16} /></button></div>
+          <label className="ws-label" htmlFor="yt-paste">참고 글 붙여넣기 (최대 {refCount}까지 이어 붙이기)</label>
+          <textarea id="yt-paste" className="ws-input" rows={5} value={ytText} onChange={e => setYtText(e.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." />
+          <button type="button" className="ws-button ws-button-primary" disabled={!ytText.trim()} onClick={() => { const found = (ytText.match(/제목:/g) || []).length; log(found > 1 ? `유튜브 참고글 ${found}개 중 첫 번째 적용` : "유튜브 참고글 적용"); applyPasted(ytText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
+          <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />인기 영상·댓글 분석으로 찾기<UiIcon name="external" size={16} /></Link><p id="youtube-topic-help" className="ws-helper">분석 화면은 새 탭에서 열립니다. 작성 중인 화면은 그대로 남아요.</p>
         </div>}
-        {sourceTab === "youtube" && <div className="ws-form-group">
-          <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />유튜브에서 주제 찾기<UiIcon name="external" size={16} /></Link><p id="youtube-topic-help" className="ws-helper">새 탭에서 영상과 댓글을 살펴보세요. 작성 중인 화면은 그대로 남아요.</p></div>}
         {sourceTab === "image" && <div className="ws-form-group" role="group" aria-label="이미지 예시 참고"><span className="ws-label">이미지 예시 참고</span><p className="ws-helper">맘에 드는 대표 문구를 고르면 그에 맞는 주제로 시작합니다.</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{IMAGE_EXAMPLES.map(ex => <button key={ex.copy} type="button" className="ws-button" style={{ padding: 0, overflow: "hidden" }} onClick={() => { setInput(ex.prompt); setQuick("자유 주제"); setSourceTab("direct"); log(`이미지 예시 선택: ${ex.copy}`); say("주제를 넣었어요. 아래에서 작성해 주세요."); }}><span style={{ display: "block", background: ex.bg, color: "#fff", fontWeight: 900, fontSize: 15, padding: "22px 10px" }}>{ex.copy}</span><span style={{ display: "block", fontSize: 11, padding: "8px", opacity: 0.65 }}>이 주제로 시작</span></button>)}</div></div>}
         <div className="ws-form-group" role="group" aria-label="글 유형"><span className="ws-label">글 유형</span><div className="ws-chips">{POST_TYPES.map(p => <button key={p.id} type="button" aria-pressed={postType === p.type} className={`ws-chip ${postType === p.type ? "is-active" : ""}`} onClick={() => setPostType(postType === p.type ? "" : p.type)}>{p.id}</button>)}</div>{!postType && <p className="ws-helper">고르지 않으면 주제에 맞게 자동으로 정해져요.</p>}</div>
