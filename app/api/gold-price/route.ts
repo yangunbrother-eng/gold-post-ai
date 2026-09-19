@@ -25,6 +25,7 @@ type GoldResponse = {
 };
 
 const SOURCE_URL = "https://www.koreagoldx.co.kr/price/gold";
+const PUBLIC_FALLBACK_URL = "https://anseonggold.co.kr/gold-price";
 const CHART_ENDPOINTS = [
   "https://koreagoldx.co.kr/api/price/chart/list",
   "https://www.koreagoldx.co.kr/api/price/chart/list",
@@ -137,12 +138,7 @@ function makeRow(
   const sellDelta = calcChange(sell, previousSell);
 
   return {
-    id,
-    name,
-    sub,
-    buy,
-    buyLabel,
-    sell,
+    id, name, sub, buy, buyLabel, sell,
     buyChange: buyDelta.value,
     sellChange: sellDelta.value,
     buyPct: buyDelta.pct,
@@ -150,7 +146,7 @@ function makeRow(
   };
 }
 
-async function fetchDomesticPrice(): Promise<GoldResponse> {
+async function fetchOfficialApi(): Promise<GoldResponse> {
   const list = await fetchChartList();
   const current = list[0] ?? {};
   const previous = list[1];
@@ -173,6 +169,79 @@ async function fetchDomesticPrice(): Promise<GoldResponse> {
     priceDate: String(current.date ?? ""),
     rows,
   };
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pair(text: string, pattern: RegExp): [number, number] | null {
+  const m = text.match(pattern);
+  if (!m) return null;
+  const buy = numberOf(m[1]);
+  const sell = numberOf(m[2]);
+  return buy != null && sell != null ? [buy, sell] : null;
+}
+
+async function fetchPublicDomesticFallback(): Promise<GoldResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await fetch(PUBLIC_FALLBACK_URL, {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": "Mozilla/5.0 (compatible; GoldPostAI/1.0)",
+      },
+    });
+    if (!response.ok) throw new Error(`fallback HTTP ${response.status}`);
+    const text = stripHtml(await response.text());
+
+    const pure = pair(text, /순금\s*24K\s*([0-9,]+)원\s*([0-9,]+)원/i);
+    const k18 = pair(text, /18K\s*([0-9,]+)원\s*([0-9,]+)원/i);
+    const k14 = pair(text, /14K\s*([0-9,]+)원\s*([0-9,]+)원/i);
+    const pt = pair(text, /백금\s*\(?Pt\)?\s*([0-9,]+)원\s*([0-9,]+)원/i);
+    const ag = pair(text, /은\s*\(?Ag\)?\s*([0-9,]+)원\s*([0-9,]+)원/i);
+    const date = text.match(/기준\s*[:：]?\s*(20\d{2}[-.]\d{2}[-.]\d{2}(?:\s+\d{2}:\d{2})?)/)?.[1] ?? "";
+
+    if (!pure || !k18 || !k14 || !pt || !ag) throw new Error("fallback table parse failed");
+
+    const rows: GoldRow[] = [
+      { id:"24k", name:"순금시세", sub:"Gold 24K · 3.75g", buy:pure[0], sell:pure[1], buyChange:null, sellChange:null, buyPct:null, sellPct:null },
+      { id:"18k", name:"18K 금시세", sub:"Gold 18K · 3.75g", buy:null, buyLabel:"제품시세적용", sell:k18[1], buyChange:null, sellChange:null, buyPct:null, sellPct:null },
+      { id:"14k", name:"14K 금시세", sub:"Gold 14K · 3.75g", buy:null, buyLabel:"제품시세적용", sell:k14[1], buyChange:null, sellChange:null, buyPct:null, sellPct:null },
+      { id:"platinum", name:"백금시세", sub:"Platinum · 3.75g", buy:pt[0], sell:pt[1], buyChange:null, sellChange:null, buyPct:null, sellPct:null },
+      { id:"silver", name:"은시세", sub:"Silver · 3.75g", buy:ag[0], sell:ag[1], buyChange:null, sellChange:null, buyPct:null, sellPct:null },
+    ];
+
+    return {
+      source: "한국금거래소 공식 고시가 · 안성공도점 공개 시세",
+      sourceUrl: PUBLIC_FALLBACK_URL,
+      unit: "3.75g / 1돈",
+      fetchedAt: new Date().toISOString(),
+      priceDate: date,
+      rows,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchDomesticPrice(): Promise<GoldResponse> {
+  try {
+    return await fetchOfficialApi();
+  } catch (officialError) {
+    console.warn("[gold-price] official API failed, trying public domestic fallback", officialError);
+    return await fetchPublicDomesticFallback();
+  }
 }
 
 export async function GET() {
