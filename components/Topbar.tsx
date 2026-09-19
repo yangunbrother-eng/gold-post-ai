@@ -8,6 +8,7 @@ import Icon, { type IconName } from "@/components/Icon";
 const TABS: { href: string; label: string; icon: IconName; ariaLabel?: string }[] = [
   { href: "/", label: "홈", icon: "home" },
   { href: "/create", label: "소식 만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
+  { href: "/trends", label: "유튜브", icon: "youtube", ariaLabel: "유튜브에서 주제 찾기" },
   { href: "/library", label: "보관함", icon: "folder" },
   { href: "/calendar", label: "캘린더", icon: "calendar" },
 ];
