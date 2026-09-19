@@ -33,6 +33,7 @@ function buildPrompt(topic: string, brand: Record<string, unknown>, tone: string
 
 규칙:
 - 한국어, 과장·허위 금지, 이모지 2개 이내
+- 글 공식 준수: ① 후킹(첫 문장 주목) → ② 문제제기(고객의 고민·불안) → ③ 공감(“당연하다/잘 안다”) → ④ 문제해결(구체적 답+증거) → CTA
 - 본문 끝에 방문 정보(주소·영업시간·전화)와 CTA 포함
 - 해시태그는 지역명 포함 3~5개
 - type 필드는 "${type}" 그대로 유지

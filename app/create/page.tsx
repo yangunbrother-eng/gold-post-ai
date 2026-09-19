@@ -80,6 +80,8 @@ function CreateInner() {
   const [postType, setPostType] = useState<ContentType | "">("");
   const [naverKw, setNaverKw] = useState("");
   const [naverText, setNaverText] = useState("");
+  const [refCount, setRefCount] = useState("5개");
+  const [extra, setExtra] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const effectiveTone = toneSel || tone;
   const log = (message: string) => {
@@ -150,9 +152,10 @@ function CreateInner() {
   const basePost = (): GeneratedPost => ({ title, body, hook: post?.hook ?? body.split("\n")[0] ?? "", coreMessage: post?.coreMessage ?? "", cta: post?.cta ?? brand.defaultCta, imageCopy: post?.imageCopy ?? title.slice(0, 14), imageSubCopy: post?.imageSubCopy ?? brand.businessName, hashtags: tags, type: post?.type ?? detected });
   const generate = async () => {
     if (!input.trim()) { setError("어떤 소식을 쓸지 먼저 한 줄로 적어 주세요."); return; }
+    const effectiveInput = extra.trim() ? `${input}\n\n[추가 요청] ${extra.trim()}` : input;
     log(`초안 작성 시작 (방식: ${provider}, 말투: ${effectiveTone}, 분량: ${lenSel})`);
     if (provider === "chatgpt" || provider === "gemini") {
-      const prompt = buildHostPrompt(input, brand, effectiveTone, detected);
+      const prompt = buildHostPrompt(effectiveInput, brand, effectiveTone, detected);
       const name = provider === "gemini" ? "Gemini" : "ChatGPT";
       setHostPrompt(prompt); setShowPaste(true); setError("");
       const clipboard = navigator.clipboard?.writeText(prompt).then(() => true).catch(() => false) ?? Promise.resolve(false);
@@ -165,9 +168,9 @@ function CreateInner() {
     const controller = new AbortController(); request.current = controller;
     const timeout = setTimeout(() => controller.abort(), 60000);
     try {
-      if (provider === "template") { let p = generatePost(input, brand, effectiveTone, detected, Math.floor(Math.random() * 999)); if (lenSel !== "보통") p = rewritePost(p, lenSel === "짧게" ? "short" : "long", brand); applyPost(p); log(`빠른 초안 완성 (말투: ${effectiveTone}, 분량: ${lenSel})`); say("기본 문장으로 초안을 만들었어요. 사실관계는 직접 확인해 주세요."); }
+      if (provider === "template") { let p = generatePost(effectiveInput, brand, effectiveTone, detected, Math.floor(Math.random() * 999)); if (lenSel !== "보통") p = rewritePost(p, lenSel === "짧게" ? "short" : "long", brand); applyPost(p); log(`빠른 초안 완성 (말투: ${effectiveTone}, 분량: ${lenSel})`); say("기본 문장으로 초안을 만들었어요. 사실관계는 직접 확인해 주세요."); }
       else {
-        const response = await fetch("/api/generate-post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: input, brand, tone: effectiveTone, type: detected, provider: "auto" }), signal: controller.signal });
+        const response = await fetch("/api/generate-post", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: effectiveInput, brand, tone: effectiveTone, type: detected, provider: "auto" }), signal: controller.signal });
         const result = await response.json();
         if (!response.ok || !result.post || typeof result.post.title !== "string" || typeof result.post.body !== "string") throw new Error("generation");
         let p = { ...basePost(), ...result.post, hook: result.post.hook ?? "", coreMessage: result.post.coreMessage ?? "", cta: result.post.cta ?? brand.defaultCta, imageCopy: result.post.imageCopy ?? result.post.title.slice(0, 14), imageSubCopy: result.post.imageSubCopy ?? brand.businessName, hashtags: Array.isArray(result.post.hashtags) ? result.post.hashtags : [], type: detected };
@@ -239,16 +242,17 @@ function CreateInner() {
         {sourceTab === "naver" && <div className="ws-form-group ws-stack">
           <span className="ws-label">네이버에서 찾기</span>
           <p className="ws-helper">키워드로 네이버 검색을 열고, 참고할 글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
-          <div className="ws-secondary-actions"><input className="ws-input" value={naverKw} onChange={e => setNaverKw(e.target.value)} placeholder="검색어 (예: 금니 매입)" aria-label="네이버 검색어" /><button type="button" className="ws-button" onClick={() => window.open(`https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(naverKw.trim() || input.trim() || "금매입")}`, "_blank", "noopener")}>네이버 검색 열기<UiIcon name="external" size={16} /></button></div>
-          <label className="ws-label" htmlFor="naver-paste">참고 글 붙여넣기</label>
+          <div className="ws-secondary-actions"><input className="ws-input" value={naverKw} onChange={e => setNaverKw(e.target.value)} placeholder="검색 키워드 (예: 금니 매입)" aria-label="네이버 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label><button type="button" className="ws-button" onClick={() => window.open(`https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(naverKw.trim() || input.trim() || "금매입")}`, "_blank", "noopener")}>네이버 검색 열기<UiIcon name="external" size={16} /></button></div>
+          <label className="ws-label" htmlFor="naver-paste">참고 글 붙여넣기 (최대 {refCount}까지 이어 붙이기)</label>
           <textarea id="naver-paste" className="ws-input" rows={5} value={naverText} onChange={e => setNaverText(e.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." />
-          <button type="button" className="ws-button ws-button-primary" disabled={!naverText.trim()} onClick={() => { log("네이버 참고글 적용"); applyPasted(naverText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
+          <button type="button" className="ws-button ws-button-primary" disabled={!naverText.trim()} onClick={() => { const found = (naverText.match(/제목:/g) || []).length; log(found > 1 ? `네이버 참고글 ${found}개 중 첫 번째 적용` : "네이버 참고글 적용"); applyPasted(naverText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
         </div>}
         {sourceTab === "youtube" && <div className="ws-form-group">
           <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />유튜브에서 주제 찾기<UiIcon name="external" size={16} /></Link><p id="youtube-topic-help" className="ws-helper">새 탭에서 영상과 댓글을 살펴보세요. 작성 중인 화면은 그대로 남아요.</p></div>}
         {sourceTab === "image" && <div className="ws-form-group" role="group" aria-label="이미지 예시 참고"><span className="ws-label">이미지 예시 참고</span><p className="ws-helper">맘에 드는 대표 문구를 고르면 그에 맞는 주제로 시작합니다.</p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{IMAGE_EXAMPLES.map(ex => <button key={ex.copy} type="button" className="ws-button" style={{ padding: 0, overflow: "hidden" }} onClick={() => { setInput(ex.prompt); setQuick("자유 주제"); setSourceTab("direct"); log(`이미지 예시 선택: ${ex.copy}`); say("주제를 넣었어요. 아래에서 작성해 주세요."); }}><span style={{ display: "block", background: ex.bg, color: "#fff", fontWeight: 900, fontSize: 15, padding: "22px 10px" }}>{ex.copy}</span><span style={{ display: "block", fontSize: 11, padding: "8px", opacity: 0.65 }}>이 주제로 시작</span></button>)}</div></div>}
         <div className="ws-form-group" role="group" aria-label="글 유형"><span className="ws-label">글 유형</span><div className="ws-chips">{POST_TYPES.map(p => <button key={p.id} type="button" aria-pressed={postType === p.type} className={`ws-chip ${postType === p.type ? "is-active" : ""}`} onClick={() => setPostType(postType === p.type ? "" : p.type)}>{p.id}</button>)}</div>{!postType && <p className="ws-helper">고르지 않으면 주제에 맞게 자동으로 정해져요.</p>}</div>
+        <div className="ws-form-group"><label className="ws-label" htmlFor="extra-req">추가 요청 사항</label><textarea id="extra-req" className="ws-input" rows={2} value={extra} onChange={e => setExtra(e.target.value)} placeholder="예) 끝문장은 전화번호로 끝나게, 이모지 빼고" /></div>
         <div className="ws-form-group"><span className="ws-label">어떻게 작성할까요?</span><div className="ws-provider-grid">{PROVIDERS.map(p => <button type="button" key={p.id} aria-pressed={provider === p.id} className={`ws-provider ${provider === p.id ? "is-active" : ""}`} onClick={() => { setProvider(p.id); setShowPaste(false); }}><strong>{p.name}</strong><small>{p.desc}</small></button>)}</div></div>
         <div className="ws-form-group ws-secondary-actions">
           <div style={{ flex: 1 }}><label className="ws-label" htmlFor="tone-sel">말투</label><select id="tone-sel" className="ws-input" value={toneSel || tone} onChange={e => setToneSel(e.target.value)}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
