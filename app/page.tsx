@@ -43,17 +43,17 @@ export default function Dashboard() {
       <Sidebar bizName={brand.businessName} extConnected={false} />
       <div className="flex-1 min-w-0">
         <Topbar title="Dashboard" sub="오늘 당근 업무를 한눈에" />
-        <main className="max-w-[1120px] mx-auto px-4 lg:px-8 py-6 space-y-5">
+        <main className="mx-auto py-5 space-y-4">
 
           {/* 히어로 — 인사 + 핵심 액션 + 빠른 주제 */}
-          <section className="rounded-2xl p-5 lg:p-6 text-white animate-fadeUp overflow-hidden relative" style={{ background: "linear-gradient(135deg,#241B10 0%,#3A2C18 60%,#4d3a1e 100%)", border: "1px solid #C9A22733" }}>
+          <section className="rounded-2xl p-5 text-white animate-fadeUp overflow-hidden relative" style={{ background: "linear-gradient(135deg,#241B10 0%,#3A2C18 60%,#4d3a1e 100%)", border: "1px solid #C9A22733" }}>
             <div className="absolute -right-10 -top-16 text-[160px] leading-none opacity-[0.07] select-none pointer-events-none">金</div>
             <div className="flex flex-wrap items-start justify-between gap-3 relative">
               <div>
                 <div className="text-[12px] font-semibold tracking-[0.14em]" style={{ color: "#D8BC6A" }}>{today} · {brand.businessName}</div>
                 <h2 className="mt-1 text-[20px] font-black tracking-tight leading-snug">오늘 당근에 어떤 소식을 올릴까요?</h2>
               </div>
-              <Link href="/create" className="btn-gold text-[13px] font-bold px-5 py-2.5 w-full sm:w-auto text-center shrink-0">✦ AI 소식 만들기</Link>
+              <Link href="/create" className="btn-gold text-[13px] font-bold px-5 py-2.5 w-full text-center shrink-0">✦ AI 소식 만들기</Link>
             </div>
             <div className="mt-4 flex flex-wrap gap-1.5 relative">
               {QUICK_TOPICS.map((t) => (
@@ -64,7 +64,7 @@ export default function Dashboard() {
           </section>
 
           {/* 핵심 숫자 — 4개로 압축 */}
-          <section className="card px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <section className="card px-5 py-4 grid grid-cols-2 gap-3">
             {[
               ["오늘 생성", stats.todayMade],
               ["검수 대기", stats.needReview],
@@ -78,7 +78,7 @@ export default function Dashboard() {
             ))}
           </section>
 
-          <div className="grid lg:grid-cols-[1fr_340px] gap-5 items-start">
+          <div className="space-y-4">
             <div className="space-y-5 min-w-0">
               {/* 추천 주제 — 2x2 */}
               <section className="card p-5">
@@ -86,7 +86,7 @@ export default function Dashboard() {
                   <h3 className="text-[15px] font-extrabold tracking-tight">✦ 오늘 추천 주제</h3>
                   <Link href="/recommend" className="text-[12px] font-bold text-neutral-400 hover:text-black">전체 보기 →</Link>
                 </div>
-                <div className="mt-3 grid sm:grid-cols-2 gap-2.5">
+                <div className="mt-3 grid grid-cols-1 gap-2.5">
                   {recommends.map((r) => (
                     <div key={r.t} className="rounded-xl border border-neutral-200 p-4 hover:border-neutral-400 transition">
                       <div className="flex items-center gap-2">
