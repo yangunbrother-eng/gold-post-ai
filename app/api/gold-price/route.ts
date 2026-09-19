@@ -235,12 +235,53 @@ async function fetchPublicDomesticFallback(): Promise<GoldResponse> {
   }
 }
 
+async function fetchIntlEstimate(): Promise<GoldResponse> {
+  // 해외 서버에서도 막히지 않는 무료 소스: 국제 금 현물 × 달러환율 → 1돈 환산 추정치
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const [g, f] = await Promise.all([
+      fetch("https://api.gold-api.com/price/XAU", { cache: "no-store", signal: ctl.signal }).then((r) => { if (!r.ok) throw new Error("xau"); return r.json(); }),
+      fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store", signal: ctl.signal }).then((r) => { if (!r.ok) throw new Error("fx"); return r.json(); })
+    ]);
+    const xau = Number(g.price);
+    const krw = Number(f.rates?.KRW);
+    if (!xau || !krw) throw new Error("intl parse failed");
+    const perDon = (xau / 31.1034768) * 3.75 * krw; // 순금 1돈 추정치
+    const r10 = (n: number) => Math.round(n / 10) * 10;
+    const kst = new Date(new Date(g.updatedAt ?? Date.now()).getTime() + 9 * 3600_000);
+    const priceDate = `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, "0")}.${String(kst.getUTCDate()).padStart(2, "0")}`;
+    const rows: GoldRow[] = [
+      { id: "24k", name: "순금시세", sub: "Gold 24K · 3.75g", buy: r10(perDon * 1.1), sell: r10(perDon), buyChange: null, sellChange: null, buyPct: null, sellPct: null },
+      { id: "18k", name: "18K 금시세", sub: "Gold 18K · 3.75g", buy: null, buyLabel: "제품시세적용", sell: r10(perDon * 0.75), buyChange: null, sellChange: null, buyPct: null, sellPct: null },
+      { id: "14k", name: "14K 금시세", sub: "Gold 14K · 3.75g", buy: null, buyLabel: "제품시세적용", sell: r10(perDon * 0.585), buyChange: null, sellChange: null, buyPct: null, sellPct: null },
+      { id: "platinum", name: "백금시세", sub: "Platinum · 3.75g", buy: null, buyLabel: "추정치 미제공", sell: null, buyChange: null, sellChange: null, buyPct: null, sellPct: null },
+      { id: "silver", name: "은시세", sub: "Silver · 3.75g", buy: null, buyLabel: "추정치 미제공", sell: null, buyChange: null, sellChange: null, buyPct: null, sellPct: null },
+    ];
+    return {
+      source: "국제시세 환산 추정치 (VAT·공임 제외)",
+      sourceUrl: "https://api.gold-api.com/price/XAU",
+      unit: "3.75g / 1돈",
+      fetchedAt: new Date().toISOString(),
+      priceDate,
+      rows,
+    };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function fetchDomesticPrice(): Promise<GoldResponse> {
   try {
     return await fetchOfficialApi();
   } catch (officialError) {
     console.warn("[gold-price] official API failed, trying public domestic fallback", officialError);
-    return await fetchPublicDomesticFallback();
+    try {
+      return await fetchPublicDomesticFallback();
+    } catch (fallbackError) {
+      console.warn("[gold-price] domestic fallback failed, trying intl estimate", fallbackError);
+      return await fetchIntlEstimate();
+    }
   }
 }
 
