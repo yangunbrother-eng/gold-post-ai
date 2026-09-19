@@ -42,18 +42,18 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
   }, [path]);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-neutral-200">
+    <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: "rgba(250,246,238,0.95)", borderColor: "#E7DCC4" }}>
       {/* 1열: 브랜드 로고 + 지점 표시 + 햄버거 버튼 */}
       <div className="px-5 lg:px-8 py-2.5 flex items-center justify-between gap-2">
         <Link href="/" className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: "var(--brand)" }}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: "linear-gradient(135deg,#C9A227,#8a6a24)" }}>
             🥕
           </div>
           <div className="min-w-0">
-            <div className="font-extrabold tracking-tight text-[15px] leading-tight flex items-center gap-1.5">
+            <div className="tracking-tight text-[15px] leading-tight flex items-center gap-1.5" style={{ fontFamily: "'Noto Serif KR',serif", fontWeight: 900 }}>
               <span>당근 Post AI</span>
             </div>
-            <div className="text-[11px] text-neutral-400 truncate leading-none mt-0.5">
+            <div className="text-[11px] truncate leading-none mt-0.5" style={{ color: "var(--gold)" }}>
               {brand.businessName || "내 비즈니스"}
             </div>
           </div>
@@ -74,18 +74,17 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
       </div>
 
       {/* 2열: 부드러운 가로 스크롤 탭 메뉴 */}
-      <nav className="px-4 lg:px-8 py-1 flex gap-0.5 overflow-x-auto no-scrollbar border-t border-neutral-100 bg-neutral-50/60 text-[11.5px] font-semibold">
+      <nav className="px-4 lg:px-8 py-1 flex gap-0.5 overflow-x-auto no-scrollbar border-t text-[11.5px] font-semibold" style={{ borderColor: "#EFE6D2", background: "rgba(243,233,210,0.5)" }}>
         {QUICK_TABS.map((t) => {
           const active = path === t.href;
           return (
             <Link
               key={t.href}
               href={t.href}
-              className={`px-3 py-1 rounded-lg whitespace-nowrap transition ${
-                active
-                  ? "bg-neutral-900 text-white font-bold shadow-sm"
-                  : "text-neutral-500 hover:text-black hover:bg-neutral-200/50"
-              }`}
+              className="px-3 py-1 rounded-lg whitespace-nowrap transition"
+              style={active
+                ? { background: "var(--brand)", color: "#F7F1E3", fontWeight: 800 }
+                : { color: "var(--ink-soft)" }}
             >
               {t.label}
             </Link>

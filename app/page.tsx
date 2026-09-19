@@ -46,18 +46,19 @@ export default function Dashboard() {
         <main className="max-w-[1120px] mx-auto px-4 lg:px-8 py-6 space-y-5">
 
           {/* 히어로 — 인사 + 핵심 액션 + 빠른 주제 */}
-          <section className="rounded-2xl p-5 lg:p-6 text-white animate-fadeUp" style={{ background: "#111" }}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <section className="rounded-2xl p-5 lg:p-6 text-white animate-fadeUp overflow-hidden relative" style={{ background: "linear-gradient(135deg,#241B10 0%,#3A2C18 60%,#4d3a1e 100%)", border: "1px solid #C9A22733" }}>
+            <div className="absolute -right-10 -top-16 text-[160px] leading-none opacity-[0.07] select-none pointer-events-none">金</div>
+            <div className="flex flex-wrap items-start justify-between gap-3 relative">
               <div>
-                <div className="text-[12px] font-semibold text-white/50">{today} · {brand.businessName}</div>
+                <div className="text-[12px] font-semibold tracking-[0.14em]" style={{ color: "#D8BC6A" }}>{today} · {brand.businessName}</div>
                 <h2 className="mt-1 text-[20px] font-black tracking-tight leading-snug">오늘 당근에 어떤 소식을 올릴까요?</h2>
               </div>
-              <Link href="/create" className="btn-primary text-[13px] font-bold px-5 py-2.5 w-full sm:w-auto text-center shrink-0">✦ AI 소식 만들기</Link>
+              <Link href="/create" className="btn-gold text-[13px] font-bold px-5 py-2.5 w-full sm:w-auto text-center shrink-0">✦ AI 소식 만들기</Link>
             </div>
-            <div className="mt-4 flex flex-wrap gap-1.5">
+            <div className="mt-4 flex flex-wrap gap-1.5 relative">
               {QUICK_TOPICS.map((t) => (
                 <Link key={t} href={`/create?topic=${encodeURIComponent(t)}`}
-                  className="rounded-lg bg-white/10 px-3 py-1.5 text-[12px] font-semibold hover:bg-white/20 transition">{t}</Link>
+                  className="rounded-lg px-3 py-1.5 text-[12px] font-semibold transition hover:bg-white/20" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(216,188,106,0.35)", color: "#F3E9D2" }}>{t}</Link>
               ))}
             </div>
           </section>

@@ -2,7 +2,7 @@ import { BrandSettings, ContentItem, Template, Branch } from "./types";
 
 export const DEFAULT_BRAND: BrandSettings = {
   businessName: "한국금거래소 동탄점",
-  color: "#FF6F0F",
+  color: "#2A2118",
   address: "경기도 화성시 동탄대로 123 1층",
   phone: "031-123-4567",
   hours: "매일 10:00 – 19:00 (일요일 정상영업)",

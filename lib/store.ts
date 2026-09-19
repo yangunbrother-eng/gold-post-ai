@@ -6,7 +6,7 @@ import { BRANCHES, DEFAULT_BRAND, REAL_POSTS } from "./sample-data";
 const K_CONTENTS = "cpai_contents_v1";
 const K_BRAND = "cpai_brand_v4";
 const K_TONE = "cpai_tone_v1";
-const K_BRANCH_BRANDS = "cpai_branch_brands_v4";
+const K_BRANCH_BRANDS = "cpai_branch_brands_v5";
 const K_ACTIVE_BRANCH = "cpai_active_branch_v4";
 const K_CUSTOM_BRANCHES = "cpai_custom_branches_v4";
 
@@ -68,7 +68,7 @@ export const JEJU_BRANCH: BranchInfo = {
 
 export const JEJU_BRAND: BrandSettings = {
   businessName: "금박사 제주점",
-  color: "#FF6F0F",
+  color: "#2A2118",
   address: "제주특별자치도 제주시 연북로 161 (연동)",
   phone: "0508-9302-3898",
   hours: "24시간 문의 가능 (00:00–24:00)",
