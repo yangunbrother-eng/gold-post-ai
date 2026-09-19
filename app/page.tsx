@@ -1,175 +1,64 @@
 "use client";
 import Link from "next/link";
 import { useMemo } from "react";
-import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
-import { StatusBadge, TypeBadge } from "@/components/PhonePreview";
+import Icon, { type IconName } from "@/components/Icon";
 import { useBrand, useContents, todayStr } from "@/lib/store";
 
-const QUICK_TOPICS = ["오늘의 시세", "고객 후기", "영업 안내", "FAQ"];
+const TOPICS: { name: string; icon: IconName; topic: string }[] = [
+  { name: "오늘의 시세", icon: "trend", topic: "오늘의 금 시세 안내. 실제 확인한 가격과 기준 시간을 입력한 뒤 게시할 글" },
+  { name: "고객 후기", icon: "message", topic: "실제 고객 후기를 소개하는 글. 고객이 남긴 원문만 바탕으로 작성" },
+  { name: "영업 안내", icon: "store", topic: "우리 가게 영업시간과 방문 전 안내" },
+  { name: "자주 묻는 질문", icon: "info", topic: "금 매입을 처음 알아보는 고객이 자주 묻는 질문" },
+];
+const IDEAS: { tag: string; title: string; description: string; icon: IconName }[] = [
+  { tag: "질문에 답하기", title: "작은 금 조각도 팔 수 있나요?", description: "처음 문의하는 고객의 궁금증을 풀어주세요.", icon: "message" },
+  { tag: "방문 안내", title: "가게에 오기 전, 이것만 확인하세요", description: "영업시간과 위치를 한 편의 소식으로 정리해요.", icon: "pin" },
+  { tag: "가게 이야기", title: "우리 가게만의 상담 과정을 소개해요", description: "실제 서비스 과정을 알려 신뢰를 쌓아보세요.", icon: "store" },
+];
+const createLink = (topic: string) => `/create?topic=${encodeURIComponent(topic)}`;
 
 export default function Dashboard() {
-  const { items } = useContents();
+  const { items, loaded } = useContents();
   const { brand } = useBrand();
   const today = todayStr();
-
-  const stats = useMemo(() => {
-    const weekAgo = Date.now() - 7 * 864e5;
-    return {
-      todayMade: items.filter((i) => i.createdAt === today).length,
-      needReview: items.filter((i) => i.status === "AI 작성 완료").length,
-      reserved: items.filter((i) => i.status === "발행 예정").length,
-      weekMade: items.filter((i) => new Date(i.createdAt).getTime() >= weekAgo).length,
-    };
-  }, [items, today]);
-
-  const todos = [
-    { label: `오늘 발행 예정`, count: items.filter((i) => i.date === today && (i.status === "발행 예정" || i.status === "검수 완료")).length, action: "/calendar" },
-    { label: `작성 필요`, count: items.filter((i) => i.status === "작성 필요").length, action: "/calendar" },
-    { label: `검수 대기`, count: items.filter((i) => i.status === "AI 작성 완료").length, action: "/library" },
-  ];
-
-  const trends = ["금값 상승", "돌반지", "지금 팔아야 하나", "18K 매입", "금테크"];
-
-  const recommends = [
-    { t: "고객 후기", d: "최근 후기 글이 적습니다", ex: "“여기서 팔길 잘했어요” 실제 방문 후기" },
-    { t: "FAQ", d: "“이것도 되나요?” 반복 질문", ex: "많이 묻는 질문 3가지" },
-    { t: "시세", d: "금값 변동이 큽니다", ex: "오늘 금값, 지금 팔아도 될까요?" },
-    { t: "방문 유도", d: "주말 방문 유도 타이밍", ex: "처음 오시는 분 필독! 주차 안내" },
-  ];
+  const stats = useMemo(() => ({
+    review: items.filter((item) => item.status === "AI 작성 완료").length,
+    scheduled: items.filter((item) => item.status === "발행 예정").length,
+    drafts: items.filter((item) => item.status === "초안" || item.status === "작성 필요").length,
+    published: items.filter((item) => item.status === "발행됨").length,
+  }), [items]);
+  const recent = useMemo(() => [...items].filter((item) => item.status !== "보관").sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3), [items]);
 
   return (
-    <div className="min-h-screen flex">
-      <Sidebar bizName={brand.businessName} extConnected={false} />
-      <div className="flex-1 min-w-0">
-        <Topbar title="Dashboard" sub="오늘 당근 업무를 한눈에" />
-        <main className="mx-auto py-5 space-y-4">
+    <div className="app-root">
+      <Topbar title="" />
+      <main id="main-content" className="studio-main" tabIndex={-1}>
+        <section className="welcome-heading"><p className="eyebrow">{today.replaceAll("-", ".")} · 오늘의 작업 공간</p><h1>오늘도, 반가운 소식 하나.</h1><p>{brand.businessName}의 이야기를 더 쉽게 전해보세요.</p></section>
 
-          {/* 히어로 — 인사 + 핵심 액션 + 빠른 주제 */}
-          <section className="rounded-2xl p-5 text-white animate-fadeUp overflow-hidden relative" style={{ background: "linear-gradient(135deg,#241B10 0%,#3A2C18 60%,#4d3a1e 100%)", border: "1px solid #C9A22733" }}>
-            <div className="absolute -right-10 -top-16 text-[160px] leading-none opacity-[0.07] select-none pointer-events-none">金</div>
-            <div className="flex flex-wrap items-start justify-between gap-3 relative">
-              <div>
-                <div className="text-[12px] font-semibold tracking-[0.14em]" style={{ color: "#D8BC6A" }}>{today} · {brand.businessName}</div>
-                <h2 className="mt-1 text-[20px] font-black tracking-tight leading-snug">오늘 당근에 어떤 소식을 올릴까요?</h2>
-              </div>
-              <Link href="/create" className="btn-gold text-[13px] font-bold px-5 py-2.5 w-full text-center shrink-0">✦ AI 소식 만들기</Link>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-1.5 relative">
-              {QUICK_TOPICS.map((t) => (
-                <Link key={t} href={`/create?topic=${encodeURIComponent(t)}`}
-                  className="rounded-lg px-3 py-1.5 text-[12px] font-semibold transition hover:bg-white/20" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(216,188,106,0.35)", color: "#F3E9D2" }}>{t}</Link>
-              ))}
-            </div>
-          </section>
+        <section className="compose-card" aria-labelledby="compose-title">
+          <div className="compose-top"><span className="compose-label"><Icon name="sparkles" size={15} /> 소식 작성 도우미</span><span className="step-label">주제 → 작성 → 게시 준비</span></div>
+          <h2 id="compose-title">무슨 글을 쓸지 고민될 때,<br />주제만 골라 시작하세요.</h2>
+          <p>글 작성부터 이미지와 게시 준비까지 한곳에서.</p>
+          <Link href="/create" className="primary-action"><Icon name="edit" />새 소식 만들기<Icon name="arrow" size={19} /></Link>
+          <div className="quick-topics" aria-label="빠른 주제 선택">{TOPICS.map((topic) => <Link key={topic.name} href={createLink(topic.topic)}><Icon name={topic.icon} size={16} /><span>{topic.name}</span></Link>)}</div>
+        </section>
 
-          {/* 핵심 숫자 — 4개로 압축 */}
-          <section className="card px-5 py-4 grid grid-cols-2 gap-3">
-            {[
-              ["오늘 생성", stats.todayMade],
-              ["검수 대기", stats.needReview],
-              ["발행 예정", stats.reserved],
-              ["이번 주 작성", stats.weekMade],
-            ].map(([l, v]) => (
-              <div key={l as string}>
-                <div className="label">{l}</div>
-                <div className="text-[22px] font-black tracking-tight mt-0.5">{v}<span className="text-[12px] font-semibold text-neutral-400 ml-1">건</span></div>
-              </div>
-            ))}
-          </section>
-
-          <div className="space-y-4">
-            <div className="space-y-5 min-w-0">
-              {/* 추천 주제 — 2x2 */}
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">✦ 오늘 추천 주제</h3>
-                  <Link href="/recommend" className="text-[12px] font-bold text-neutral-400 hover:text-black">전체 보기 →</Link>
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-2.5">
-                  {recommends.map((r) => (
-                    <div key={r.t} className="rounded-xl border border-neutral-200 p-4 hover:border-neutral-400 transition">
-                      <div className="flex items-center gap-2">
-                        <TypeBadge type={r.t} />
-                        <span className="text-[12px] text-neutral-500">{r.d}</span>
-                      </div>
-                      <div className="mt-2 text-[13px] font-bold tracking-tight leading-snug">“{r.ex}”</div>
-                      <Link href={`/create?topic=${encodeURIComponent(r.ex)}`} className="mt-2.5 inline-block text-[12px] font-bold btn-ghost px-3 py-1.5">바로 만들기 →</Link>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* 최근 콘텐츠 */}
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">최근 콘텐츠</h3>
-                  <Link href="/history" className="text-[12px] font-bold text-neutral-400 hover:text-black">이력 전체 →</Link>
-                </div>
-                <div className="mt-2 divide-y divide-neutral-100">
-                  {items.slice(0, 5).map((c) => (
-                    <div key={c.id} className="py-2.5 flex items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-bold truncate">{c.title}</div>
-                        <div className="text-[12px] text-neutral-400 mt-0.5">{c.date} <span className="dot" />{c.type}</div>
-                      </div>
-                      <StatusBadge status={c.status} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            {/* 우측 rail */}
-            <div className="space-y-5">
-              <section className="card p-5">
-                <h3 className="text-[15px] font-extrabold tracking-tight">오늘 해야 할 일</h3>
-                <div className="mt-3 space-y-1">
-                  {todos.map((t) => (
-                    <Link key={t.label} href={t.action} className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-neutral-50 transition">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${t.count > 0 ? "bg-[var(--brand)]" : "bg-neutral-200"}`} />
-                      <span className="text-[13px] font-semibold flex-1">{t.label}</span>
-                      <span className="text-[13px] font-black">{t.count}건</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">콘텐츠 트렌드</h3>
-                  <Link href="/trends" className="text-[12px] font-bold text-neutral-400 hover:text-black">분석 →</Link>
-                </div>
-                <div className="mt-3 space-y-1">
-                  {trends.map((t, i) => (
-                    <Link key={t} href={`/create?topic=${encodeURIComponent(t + " 관련 당근 소식")}`}
-                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-neutral-50 transition">
-                      <span className="text-[12px] font-black text-neutral-300 w-4">{i + 1}</span>
-                      <span className="text-[13px] font-semibold flex-1 truncate">#{t}</span>
-                      <span className="text-[12px] font-bold text-neutral-400">→</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">이번 주 예약 플랜</h3>
-                  <Link href="/calendar" className="text-[12px] font-bold text-neutral-400 hover:text-black">캘린더 →</Link>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-1.5">
-                  {[["월", "금 시세"], ["화", "고객 후기"], ["수", "정보 콘텐츠"], ["목", "FAQ"], ["금", "매입 사례"], ["토", "방문 유도"]].map(([d, t]) => (
-                    <div key={d} className="flex items-center gap-2 rounded-lg bg-neutral-50 border border-neutral-100 px-2.5 py-2">
-                      <span className="text-[12px] font-black text-neutral-400">{d}</span>
-                      <span className="text-[12px] font-semibold truncate">{t}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
+        <section aria-labelledby="work-title" aria-busy={!loaded}>
+          <div className="section-heading"><h2 id="work-title">내 콘텐츠 현황</h2><span className="muted-text">저장한 글 기준</span></div>
+          <div className="work-grid">
+            <Link href="/library?status=review" className="work-card"><span className="soft-icon orange"><Icon name="edit" /></span><span>검수할 소식<strong>{loaded ? stats.review : "–"}<small>건</small></strong></span><Icon name="chevron" size={16} /></Link>
+            <Link href="/library?status=scheduled" className="work-card"><span className="soft-icon green"><Icon name="calendar" /></span><span>발행 예정<strong>{loaded ? stats.scheduled : "–"}<small>건</small></strong></span><Icon name="chevron" size={16} /></Link>
           </div>
-        </main>
-      </div>
+          <div className="work-summary"><span>작성 중 <b>{loaded ? stats.drafts : "–"}</b>건</span><span>발행한 소식 <b>{loaded ? stats.published : "–"}</b>건</span><Link href="/library">모두 보기<Icon name="arrow" size={15} /></Link></div>
+        </section>
+
+        <section aria-labelledby="ideas-title"><div className="section-heading"><div><h2 id="ideas-title">이 주제로 시작해 보세요</h2><p className="section-description">가게 소식에 활용하기 좋은 기본 아이디어예요.</p></div></div><div className="ideas-list">{IDEAS.map((idea, index) => <Link className="idea-card" key={idea.title} href={createLink(idea.title)}><span className={`soft-icon idea-icon tone-${index}`}><Icon name={idea.icon} size={23} /></span><span className="idea-content"><small>{idea.tag}</small><strong>{idea.title}</strong><span>{idea.description}</span></span><Icon name="chevron" size={18} /></Link>)}</div><Link href="/recommend" className="quiet-link">다른 추천 주제 보기<Icon name="arrow" size={16} /></Link></section>
+
+        <section aria-labelledby="recent-title" aria-busy={!loaded}><div className="section-heading"><h2 id="recent-title">최근 작업한 소식</h2><Link href="/library" className="text-link">보관함<Icon name="arrow" size={16} /></Link></div><div className="recent-list">{!loaded ? <p className="empty-note" role="status">저장한 소식을 불러오는 중이에요.</p> : recent.length ? recent.map((item) => <Link key={item.id} href={`/library?q=${encodeURIComponent(item.title)}`} className="recent-item"><span className="recent-icon"><Icon name="folder" size={19} /></span><span className="recent-content"><strong>{item.title}</strong><span>{item.createdAt} · {item.type}</span></span><span className={`status-label ${item.status === "발행됨" ? "status-published" : ""}`}>{item.status}</span></Link>) : <div className="empty-state"><Icon name="folder" size={30} /><h3>첫 소식을 만들어 볼까요?</h3><p>작성한 글은 이곳에서 다시 찾을 수 있어요.</p><Link href="/create" className="text-link">소식 만들기<Icon name="arrow" size={16} /></Link></div>}</div></section>
+        <aside className="workflow-note"><Icon name="info" size={18} /><p>발행 예정은 일정 관리 표시예요. <strong>당근 게시 완료 여부는 직접 확인해 주세요.</strong></p></aside>
+        <footer className="studio-footer">우리 가게의 이야기가 단골과 만나는 곳.<span>당근 Post AI</span></footer>
+      </main>
     </div>
   );
 }

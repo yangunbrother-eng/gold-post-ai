@@ -1,60 +1,61 @@
 "use client";
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import Sidebar from "@/components/Sidebar";
+import { useSearchParams } from "next/navigation";
 import Topbar from "@/components/Topbar";
-import { StatusBadge, TypeBadge } from "@/components/PhonePreview";
-import { useBrand, useContents } from "@/lib/store";
+import Icon from "@/components/Icon";
+import { useContents } from "@/lib/store";
+import type { ContentItem } from "@/lib/types";
 
-const TYPE_FILTER = ["전체", "정보형", "후기형", "이벤트", "FAQ", "상품 소개", "영업 안내", "시세", "방문 유도"];
-const STATUS_FILTER = ["전체", "초안", "완료", "발행됨", "보관"];
+const FILTERS = [
+  { id: "all", label: "전체", statuses: [] },
+  { id: "draft", label: "작성 중", statuses: ["초안", "작성 필요"] },
+  { id: "review", label: "검수 대기", statuses: ["AI 작성 완료"] },
+  { id: "scheduled", label: "발행 예정", statuses: ["발행 예정"] },
+  { id: "published", label: "발행됨", statuses: ["발행됨"] },
+  { id: "archived", label: "보관", statuses: ["보관"] },
+];
+const TYPES = ["시세", "고객 후기", "실제 사례", "상품 소개", "FAQ", "이벤트", "영업 안내", "방문 안내", "정보성", "후기형", "문의 유도형", "자유 주제"];
 
-export default function Library() {
-  const { brand } = useBrand();
-  const { items, remove, save } = useContents();
-  const [q, setQ] = useState("");
-  const [type, setType] = useState("전체");
-  const [status, setStatus] = useState("전체");
+function LibraryInner() {
+  const params = useSearchParams();
+  const initialQuery = params.get("q") ?? "";
+  const initialStatus = params.get("status") ?? "all";
+  const { items, loaded, remove, save } = useContents();
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState(initialStatus);
+  const [type, setType] = useState("");
+  const [notice, setNotice] = useState("");
+  useEffect(() => { setQuery(initialQuery); setStatus(FILTERS.some((filter) => filter.id === initialStatus) ? initialStatus : "all"); }, [initialQuery, initialStatus]);
+  useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(""), 3200); return () => clearTimeout(timer); }, [notice]);
+  const list = useMemo(() => {
+    const selected = FILTERS.find((filter) => filter.id === status) ?? FILTERS[0];
+    const needle = query.trim().toLocaleLowerCase("ko-KR");
+    return items.filter((item) => (!needle || `${item.title} ${item.body}`.toLocaleLowerCase("ko-KR").includes(needle)) && (!type || item.type === type) && (!selected.statuses.length || selected.statuses.includes(item.status))).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [items, query, status, type]);
+  const reset = () => { setQuery(""); setType(""); setStatus("all"); };
+  const copy = async (item: ContentItem) => {
+    try { await navigator.clipboard.writeText(`${item.title}\n\n${item.body}`); setNotice("제목과 본문을 복사했어요."); }
+    catch { setNotice("복사 권한을 확인하거나 내용을 펼쳐 직접 복사해 주세요."); }
+  };
+  const archive = (item: ContentItem) => { save(items.map((entry) => entry.id === item.id ? { ...entry, status: "보관" as const } : entry)); setNotice("보관 처리했어요. ‘보관’ 필터에서 확인하세요."); };
+  const deleteItem = (item: ContentItem) => { if (window.confirm(`‘${item.title}’ 소식을 삭제할까요?\n이 작업은 되돌릴 수 없어요.`)) { remove(item.id); setNotice("소식을 삭제했어요."); } };
 
-  const list = useMemo(() => items.filter((c) => {
-    const okQ = !q || (c.title + c.body).includes(q);
-    const okT = type === "전체" || c.type.includes(type.replace("형", "")) || (type === "정보형" && c.type === "정보성");
-    const okS = status === "전체" || (status === "완료" ? ["AI 작성 완료", "검수 완료", "발행 예정"].includes(c.status) : c.status === status);
-    return okQ && okT && okS;
-  }), [items, q, type, status]);
-
-  return (
-    <div className="min-h-screen flex">
-      <Sidebar bizName={brand.businessName} extConnected={false} />
-      <div className="flex-1 min-w-0">
-        <Topbar title="콘텐츠 보관함" sub={`${items.length}건 저장됨`} />
-        <main className="max-w-[1000px] mx-auto px-4 lg:px-8 py-6 space-y-4">
-          <div className="hidden lg:block"><h1 className="text-[26px] font-black tracking-tight">콘텐츠 보관함</h1></div>
-          <div className="card p-4 space-y-3">
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="검색 — 제목·본문에서 찾기" className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-[14px] outline-none focus:border-neutral-400" />
-            <div className="flex flex-wrap gap-1.5">{TYPE_FILTER.map((t) => (<button key={t} onClick={() => setType(t)} className={`chip !text-[12px] ${type === t ? "active" : ""}`}>{t}</button>))}</div>
-            <div className="flex flex-wrap gap-1.5">{STATUS_FILTER.map((t) => (<button key={t} onClick={() => setStatus(t)} className={`chip !text-[12px] ${status === t ? "active" : ""}`}>{t}</button>))}</div>
-          </div>
-          <div className="grid gap-2.5">
-            {list.map((c) => (
-              <div key={c.id} className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-[14px] truncate">{c.title}</div>
-                  <div className="mt-1 flex items-center gap-1.5 flex-wrap"><TypeBadge type={c.type} /><StatusBadge status={c.status} /><span className="text-[11.5px] text-neutral-400">{c.date}</span>
-                    {c.sourceUrl && (<><span className="text-[11px] font-bold bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">당근 실제 발행글</span><a href={c.sourceUrl} target="_blank" rel="noreferrer" className="text-[11.5px] font-bold text-neutral-500 underline">원문 보기 ↗</a></>)}
-                    {c.publishNote && <span className="text-[11.5px] text-neutral-400">{c.publishNote}</span>}</div>
-                </div>
-                <div className="flex gap-1.5 shrink-0 w-full sm:w-auto">
-                  <Link href={`/create?topic=${encodeURIComponent(c.title)}`} className="btn-ghost flex-1 sm:flex-none px-3 py-2 text-[12px] font-bold text-center">재활용</Link>
-                  <button onClick={() => save(items.map((i) => i.id === c.id ? { ...i, status: "보관" as const } : i))} className="btn-ghost flex-1 sm:flex-none px-3 py-2 text-[12px] font-bold">보관</button>
-                  <button onClick={() => remove(c.id)} className="btn-ghost flex-1 sm:flex-none px-3 py-2 text-[12px] font-bold text-red-500">삭제</button>
-                </div>
-              </div>
-            ))}
-            {list.length === 0 && <div className="card p-10 text-center text-neutral-400 text-[14px]">조건에 맞는 콘텐츠가 없습니다.</div>}
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+  return <div className="app-root"><Topbar title="콘텐츠 보관함" sub="작성한 글을 찾고, 다음 소식의 아이디어로 활용하세요." /><main id="main-content" className="studio-main library-main" tabIndex={-1} aria-busy={!loaded}>
+    <section className="library-search" aria-label="소식 검색과 필터">
+      <div className="search-field"><Icon name="search" size={21} /><label htmlFor="content-search" className="sr-only">제목 또는 본문 검색</label><input id="content-search" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="어떤 소식을 찾으세요?" />{query && <button type="button" onClick={() => setQuery("")} className="icon-button" aria-label="검색어 지우기"><Icon name="close" size={18} /></button>}</div>
+      <div className="filter-tabs" aria-label="콘텐츠 상태">{FILTERS.map((filter) => <button key={filter.id} type="button" aria-pressed={status === filter.id} onClick={() => setStatus(filter.id)} className={status === filter.id ? "is-active" : ""}>{filter.label}</button>)}</div>
+      <div className="filter-bottom"><p role="status">{loaded ? <><strong>{list.length}</strong>개의 소식</> : "불러오는 중…"}</p><label className="sr-only" htmlFor="content-type">콘텐츠 유형</label><select id="content-type" value={type} onChange={(event) => setType(event.target.value)}><option value="">모든 유형</option>{TYPES.map((item) => <option key={item} value={item}>{item}</option>)}</select></div>
+    </section>
+    <div className="library-list">{!loaded ? <div className="empty-state" role="status"><Icon name="folder" size={30} /><p>저장한 소식을 불러오고 있어요.</p></div> : list.length ? list.map((item) => <article key={item.id} className="content-card">
+      <div className="content-meta"><span>{item.type}</span><span className={`status-label ${item.status === "발행됨" ? "status-published" : ""}`}>{item.status}</span></div>
+      <h2>{item.title}</h2><p className="body-excerpt">{item.body || "아직 본문이 없는 소식이에요."}</p>
+      <div className="content-date"><span>{item.createdAt}</span>{item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl) && <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">당근 원문 보기 ↗</a>}</div>
+      <details className="content-details"><summary>내용 펼쳐보기</summary><p>{item.body}</p>{item.publishNote && <small>{item.publishNote}</small>}</details>
+      <div className="content-actions"><Link href={`/create?topic=${encodeURIComponent(item.title)}`} className="reuse-action"><Icon name="sparkles" size={16} />이 주제로 새 글</Link><button type="button" onClick={() => void copy(item)} aria-label={`${item.title} 제목과 본문 복사`}><Icon name="copy" size={16} />복사</button><button type="button" onClick={() => archive(item)} disabled={item.status === "보관"} aria-label={`${item.title} 보관`}><Icon name="archive" size={16} />보관</button><button type="button" className="delete-action" onClick={() => deleteItem(item)} aria-label={`${item.title} 삭제`}><Icon name="trash" size={17} /></button></div>
+    </article>) : <div className="empty-state"><Icon name="search" size={32} /><h2>{items.length ? "조건에 맞는 소식이 없어요" : "아직 저장한 소식이 없어요"}</h2><p>{items.length ? "검색어나 필터를 바꿔 다시 찾아보세요." : "새 소식을 만들면 이곳에서 관리할 수 있어요."}</p>{items.length ? <button type="button" onClick={reset} className="btn-ghost">검색 조건 초기화</button> : <Link href="/create" className="btn-primary">첫 소식 만들기</Link>}</div>}</div>
+    <aside className="workflow-note"><Icon name="info" size={18} /><p>저장된 콘텐츠는 현재 브라우저에 보관돼요. 다른 기기와 자동으로 동기화되지 않아요.</p></aside>
+    {notice && <div className="feedback-toast" role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label="알림 닫기"><Icon name="close" size={16} /></button></div>}
+  </main></div>;
 }
+export default function Library() { return <Suspense fallback={<div className="app-root"><Topbar title="콘텐츠 보관함" /><main className="studio-main"><p role="status">소식을 불러오는 중이에요.</p></main></div>}><LibraryInner /></Suspense>; }
