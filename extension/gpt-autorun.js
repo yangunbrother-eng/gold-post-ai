@@ -12,7 +12,15 @@
   // SPA 라우터가 URL 해시나 쿼리를 지워도 유지되도록 세션에 저장
   sessionStorage.setItem("cpai_active", "1");
 
-  // URL에서 q 파라미터가 있다면 세션에 보관
+  // URL fragment에 직접 전달된 프롬프트를 가장 먼저 보관.
+  // 예: #cpai=1&prompt=...  (fragment는 서버로 전송되지 않음)
+  try {
+    const hashParams = new URLSearchParams((location.hash || "").replace(/^#/, ""));
+    const directPrompt = hashParams.get("prompt");
+    if (directPrompt) sessionStorage.setItem("cpai_prompt", directPrompt);
+  } catch (e) {}
+
+  // 이전 버전 호환: q 파라미터가 있다면 세션에 보관
   try {
     const params = new URLSearchParams(location.search);
     const q = params.get("q");

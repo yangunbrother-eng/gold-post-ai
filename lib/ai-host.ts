@@ -31,23 +31,20 @@ export function buildHostPrompt(
 // ※ ?q= 파라미터 방식 제거 — ChatGPT가 ?q= 받으면 즉시 자동제출해서 gpt-autorun.js 개입 불가
 // ※ 클립보드에 프롬프트를 복사해두면 gpt-autorun.js가 읽어서 입력+전송까지 처리함
 export function openHostAi(host: "chatgpt" | "gemini", prompt: string) {
-  if (host === "chatgpt") {
-    const a = document.createElement("a");
-    a.href = `https://chatgpt.com/?cpai=1#cpai=1`;
-    a.target = "_blank";
-    a.rel = "noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  } else {
-    const a = document.createElement("a");
-    a.href = "https://gemini.google.com/app?cpai=1#cpai=1";
-    a.target = "_blank";
-    a.rel = "noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
+  // 프롬프트를 fragment에도 담아 확장프로그램이 클립보드 권한과 무관하게 바로 읽을 수 있게 한다.
+  // fragment는 서버로 전송되지 않으며, cpai=1 표식이 있는 탭에서만 확장이 자동 입력/전송한다.
+  const hash = `#cpai=1&prompt=${encodeURIComponent(prompt)}`;
+  const href = host === "chatgpt"
+    ? `https://chatgpt.com/${hash}`
+    : `https://gemini.google.com/app${hash}`;
+
+  const a = document.createElement("a");
+  a.href = href;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // GPT가 써준 결과물을 제목/본문으로 나눔

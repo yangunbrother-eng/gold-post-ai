@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "당근 Post AI 자동입력",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "당근 Post AI에서 만든 제목·본문·AI 이미지를 당근 소식 작성 페이지에 자동 입력합니다. GPT 탭 자동 전송 지원.",
   "permissions": ["storage", "clipboardRead"],
   "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
