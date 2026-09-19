@@ -116,6 +116,40 @@
     return el.textContent && el.textContent.trim().length > 0;
   };
 
+  // ---- 답변 완성 감지 → 초안 자동 복사 (제목+본문 전체, 사이트에서 나눠 적용) ----
+  const watchAndCopy = (getLastText, isBusy) => {
+    if (sessionStorage.getItem("cpai_copied") === "1") return;
+    let lastLen = -1, stable = 0;
+    const iv = setInterval(async () => {
+      try {
+        if (isBusy()) { stable = 0; return; }
+        const text = (getLastText() || "").trim();
+        if (!text || text.length < 30) { stable = 0; return; }
+        if (text.length === lastLen) stable++;
+        else { stable = 0; lastLen = text.length; }
+        if (stable >= 2) {
+          clearInterval(iv);
+          await navigator.clipboard.writeText(text);
+          sessionStorage.setItem("cpai_copied", "1");
+          toast("✓ 초안 복사됨! 사이트로 돌아가면 자동 입력됩니다");
+        }
+      } catch (e) {}
+    }, 2000);
+    setTimeout(() => clearInterval(iv), 300000);
+  };
+  const chatLastText = () => {
+    const all = document.querySelectorAll("div[data-message-author-role='assistant']");
+    const el = all[all.length - 1];
+    return el ? el.innerText || "" : "";
+  };
+  const chatBusy = () => !!document.querySelector("button[data-testid='stop-button']");
+  const gemLastText = () => {
+    const all = document.querySelectorAll("message-content.model-response, .model-response, message-content");
+    const el = all[all.length - 1];
+    return el ? el.innerText || "" : "";
+  };
+  const gemBusy = () => !!document.querySelector("mat-progress-spinner, mat-spinner, [role='progressbar']");
+
   // ---- ChatGPT 자동 입력 및 전송 ----
   const autoChatGPT = async () => {
     let prompt = await getPrompt();
@@ -217,6 +251,7 @@
         if (btn) btn.click();
 
         toast("✦ 당근 Post AI: GPT가 소식지를 자동 작성 중입니다!");
+        watchAndCopy(chatLastText, chatBusy);
       } else if (tries > 80) {
         clearInterval(iv);
         if (box && prompt && (!box.textContent || box.textContent.trim().length === 0)) {
@@ -277,6 +312,7 @@
           }));
         }
         toast("✦ 당근 Post AI: Gemini가 소식지를 자동 작성 중입니다!");
+        watchAndCopy(gemLastText, gemBusy);
       } else if (tries > 80) {
         clearInterval(iv);
         if (box && prompt && (!box.textContent || box.textContent.trim().length === 0)) {
