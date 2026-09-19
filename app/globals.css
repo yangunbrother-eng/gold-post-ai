@@ -109,7 +109,7 @@ button, a, input, textarea, select {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* PC·모바일 동일 UI: 모든 페이지 본문 폭과 좌우 여백을 동일하게 유지 */
+/* PC·모바일 동일 UI: 모든 페이지 본문 폭과 좌우 여백을 동일하게 유지 — Vercel auto deploy */
 main {
   width: 100%;
   max-width: var(--shell) !important;
