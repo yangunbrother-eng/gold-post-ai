@@ -24,6 +24,25 @@ const PROVIDERS: { id: HostAi; name: string; desc: string }[] = [
 const TYPE_MAP: Record<string, ContentType> = { "오늘의 시세": "시세", "고객 후기": "고객 후기", "실제 사례": "실제 사례", "상품 소개": "상품 소개", "FAQ": "FAQ", "이벤트": "이벤트", "영업 안내": "영업 안내", "방문 안내": "방문 안내", "정보성 콘텐츠": "정보성", "후기형 콘텐츠": "후기형", "문의 유도형": "문의 유도형", "자유 주제": "자유 주제" };
 const TONES = ["친근한 상담형", "전문가형", "정보 전달형", "지역 친화형", "부드러운 홍보형", "광고 느낌 최소화"];
 const LENGTHS = ["짧게", "보통", "자세히"];
+const SOURCES = [
+  { id: "direct", label: "직접 주제 입력" },
+  { id: "naver", label: "네이버에서 찾기" },
+  { id: "youtube", label: "유튜브에서 찾기" },
+  { id: "image", label: "이미지 예시 참고" },
+] as const;
+const POST_TYPES: { id: string; type: ContentType }[] = [
+  { id: "정보형", type: "정보성" },
+  { id: "후기형", type: "후기형" },
+  { id: "소개형", type: "상품 소개" },
+  { id: "상담 유도형", type: "문의 유도형" },
+  { id: "이벤트/안내형", type: "이벤트" },
+];
+const IMAGE_EXAMPLES = [
+  { copy: "오늘 금값 확인하세요", bg: "#111111", prompt: "오늘 금값 기준으로 지금 팔아도 되는지 알려주는 글" },
+  { copy: "이 작은 조각도 될까요?", bg: "#FF6F0F", prompt: "작은 금 조각도 매입되는지 궁금해하는 고객용 글" },
+  { copy: "오늘 정상 영업합니다", bg: "#14324F", prompt: "오늘 정상 영업한다는 안내 글" },
+  { copy: "돌반지 얼마일까?", bg: "#5B3DF5", prompt: "오래된 돌반지 가격 문의 고객용 글" },
+];
 type StudioContent = ContentItem & { imageStudio?: ImageSettings };
 const readTags = (text: string) => Array.from(new Set(text.match(/#[^\s#]+/g) || []));
 const stamp = (title: string, body: string, tags: string[], draft: ImageStudioDraft) => JSON.stringify({ title, body, tags, settings: draft.settings, slots: draft.slots });
@@ -57,6 +76,10 @@ function CreateInner() {
   const [payloadBusy, setPayloadBusy] = useState(false);
   const [toneSel, setToneSel] = useState("");
   const [lenSel, setLenSel] = useState("보통");
+  const [sourceTab, setSourceTab] = useState<"direct" | "naver" | "youtube" | "image">("direct");
+  const [postType, setPostType] = useState<ContentType | "">("");
+  const [naverKw, setNaverKw] = useState("");
+  const [naverText, setNaverText] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const effectiveTone = toneSel || tone;
   const log = (message: string) => {
@@ -70,7 +93,7 @@ function CreateInner() {
   const request = useRef<AbortController | null>(null);
   const main = useRef<HTMLElement>(null);
   const images = useMemo(() => studio.slots.slice(0, studio.settings.count).map(s => s.url).filter(Boolean), [studio.slots, studio.settings.count]);
-  const detected = TYPE_MAP[quick] && quick !== "자유 주제" ? TYPE_MAP[quick] : detectType(input || title);
+  const detected: ContentType = postType || (TYPE_MAP[quick] && quick !== "자유 주제" ? TYPE_MAP[quick] : detectType(input || title));
   const similarity = useMemo(() => body ? checkSimilarity(body, items.filter(i => i.id !== savedId).slice(0, 8)) : 0, [body, items, savedId]);
   const say = (message: string) => { setToast(message); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(""), 4200); };
   const move = (next: number) => { if (busy || imageBusy) return; setStep(next); setError(""); requestAnimationFrame(() => main.current?.focus()); window.scrollTo({ top: 0, behavior: "auto" }); };
@@ -101,7 +124,9 @@ function CreateInner() {
     if (opened.current === key) return;
     opened.current = key;
     if (!id) {
-      setInput(params.get("topic") ?? ""); setTitle(""); setBody(""); setTags([]); setPost(null);
+      const t = params.get("topic") ?? "";
+      if (t) setSourceTab("direct");
+      setInput(t); setTitle(""); setBody(""); setTags([]); setPost(null);
       setSavedId(null); setSavedStamp(""); setStudio(newImageDraft()); setShowPaste(false);
       setStep(params.get("section") === "images" || window.location.hash === "#images" ? 3 : 1); return;
     }
@@ -205,10 +230,25 @@ function CreateInner() {
       <nav className="ws-stepper" style={{ gridTemplateColumns: "repeat(4,minmax(0,1fr))" }} aria-label="소식 작성 단계">{["주제", "초안", "이미지", "발행"].map((label, i) => <button type="button" key={label} className={`ws-step ${step === i + 1 ? "is-active" : ""} ${step > i + 1 ? "is-done" : ""}`} aria-current={step === i + 1 ? "step" : undefined} disabled={busy || imageBusy || (i === 3 && !ready)} onClick={() => move(i + 1)}><span>{i + 1}</span>{label}</button>)}</nav>
       {error && <div className="ws-note ws-note-error" role="alert"><UiIcon name="info" size={18} />{error}</div>}
       {step === 1 && <section className="ws-panel ws-compose">
-        <h2>어떤 이야기를 전할까요?</h2><p className="ws-helper">주제를 한 줄로 적거나 아래에서 골라 주세요.</p>
-        <div className="ws-form-group"><label htmlFor="post-topic" className="ws-label">오늘의 주제</label><textarea id="post-topic" className="ws-input" rows={4} value={input} onChange={e => setInput(e.target.value)} placeholder="예) 끊어진 금목걸이도 매입할 수 있다는 안내를 쓰고 싶어요." /></div>
-        <div className="ws-form-group" role="group" aria-labelledby="quick-topic-title"><span id="quick-topic-title" className="ws-label">빠른 주제 선택</span><div className="ws-chips">{QUICK_TOPICS.map(q => <button key={q} type="button" aria-pressed={quick === q} className={`ws-chip ${quick === q ? "is-active" : ""}`} onClick={() => { setQuick(q); if (!input.trim() && q !== "자유 주제") setInput(q); }}>{q}</button>)}</div>
-          <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />유튜브에서 주제 찾기<UiIcon name="external" size={16} /></Link><p id="youtube-topic-help" className="ws-helper">새 탭에서 영상과 댓글을 살펴보세요. 작성 중인 화면은 그대로 남아요.</p></div>
+        <h2>어떤 이야기를 전할까요?</h2><p className="ws-helper">찾는 방식과 글 유형을 고르면 초안이 그에 맞게 만들어져요.</p>
+        <div className="ws-form-group" role="group" aria-label="초안 찾기 방식"><span className="ws-label">초안 찾기 방식</span><div className="ws-chips">{SOURCES.map(s => <button key={s.id} type="button" aria-pressed={sourceTab === s.id} className={`ws-chip ${sourceTab === s.id ? "is-active" : ""}`} onClick={() => setSourceTab(s.id)}>{s.label}</button>)}</div></div>
+        {sourceTab === "direct" && <>
+          <div className="ws-form-group"><label htmlFor="post-topic" className="ws-label">오늘의 주제</label><textarea id="post-topic" className="ws-input" rows={4} value={input} onChange={e => setInput(e.target.value)} placeholder="예) 끊어진 금목걸이도 매입할 수 있다는 안내를 쓰고 싶어요." /></div>
+          <div className="ws-form-group" role="group" aria-labelledby="quick-topic-title"><span id="quick-topic-title" className="ws-label">빠른 주제 선택</span><div className="ws-chips">{QUICK_TOPICS.map(q => <button key={q} type="button" aria-pressed={quick === q} className={`ws-chip ${quick === q ? "is-active" : ""}`} onClick={() => { setQuick(q); if (!input.trim() && q !== "자유 주제") setInput(q); }}>{q}</button>)}</div></div>
+        </>}
+        {sourceTab === "naver" && <div className="ws-form-group ws-stack">
+          <span className="ws-label">네이버에서 찾기</span>
+          <p className="ws-helper">키워드로 네이버 검색을 열고, 참고할 글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
+          <div className="ws-secondary-actions"><input className="ws-input" value={naverKw} onChange={e => setNaverKw(e.target.value)} placeholder="검색어 (예: 금니 매입)" aria-label="네이버 검색어" /><button type="button" className="ws-button" onClick={() => window.open(`https://search.naver.com/search.naver?where=view&query=${encodeURIComponent(naverKw.trim() || input.trim() || "금매입")}`, "_blank", "noopener")}>네이버 검색 열기<UiIcon name="external" size={16} /></button></div>
+          <label className="ws-label" htmlFor="naver-paste">참고 글 붙여넣기</label>
+          <textarea id="naver-paste" className="ws-input" rows={5} value={naverText} onChange={e => setNaverText(e.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." />
+          <button type="button" className="ws-button ws-button-primary" disabled={!naverText.trim()} onClick={() => { log("네이버 참고글 적용"); applyPasted(naverText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
+        </div>}
+        {sourceTab === "youtube" && <div className="ws-form-group">
+          <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />유튜브에서 주제 찾기<UiIcon name="external" size={16} /></Link><p id="youtube-topic-help" className="ws-helper">새 탭에서 영상과 댓글을 살펴보세요. 작성 중인 화면은 그대로 남아요.</p></div>}
+        {sourceTab === "image" && <div className="ws-form-group" role="group" aria-label="이미지 예시 참고"><span className="ws-label">이미지 예시 참고</span><p className="ws-helper">맘에 드는 대표 문구를 고르면 그에 맞는 주제로 시작합니다.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{IMAGE_EXAMPLES.map(ex => <button key={ex.copy} type="button" className="ws-button" style={{ padding: 0, overflow: "hidden" }} onClick={() => { setInput(ex.prompt); setQuick("자유 주제"); setSourceTab("direct"); log(`이미지 예시 선택: ${ex.copy}`); say("주제를 넣었어요. 아래에서 작성해 주세요."); }}><span style={{ display: "block", background: ex.bg, color: "#fff", fontWeight: 900, fontSize: 15, padding: "22px 10px" }}>{ex.copy}</span><span style={{ display: "block", fontSize: 11, padding: "8px", opacity: 0.65 }}>이 주제로 시작</span></button>)}</div></div>}
+        <div className="ws-form-group" role="group" aria-label="글 유형"><span className="ws-label">글 유형</span><div className="ws-chips">{POST_TYPES.map(p => <button key={p.id} type="button" aria-pressed={postType === p.type} className={`ws-chip ${postType === p.type ? "is-active" : ""}`} onClick={() => setPostType(postType === p.type ? "" : p.type)}>{p.id}</button>)}</div>{!postType && <p className="ws-helper">고르지 않으면 주제에 맞게 자동으로 정해져요.</p>}</div>
         <div className="ws-form-group"><span className="ws-label">어떻게 작성할까요?</span><div className="ws-provider-grid">{PROVIDERS.map(p => <button type="button" key={p.id} aria-pressed={provider === p.id} className={`ws-provider ${provider === p.id ? "is-active" : ""}`} onClick={() => { setProvider(p.id); setShowPaste(false); }}><strong>{p.name}</strong><small>{p.desc}</small></button>)}</div></div>
         <div className="ws-form-group ws-secondary-actions">
           <div style={{ flex: 1 }}><label className="ws-label" htmlFor="tone-sel">말투</label><select id="tone-sel" className="ws-input" value={toneSel || tone} onChange={e => setToneSel(e.target.value)}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
