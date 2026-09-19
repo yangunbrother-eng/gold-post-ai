@@ -79,7 +79,6 @@ function CreateInner() {
   const [lenSel, setLenSel] = useState("보통");
   const [sourceTab, setSourceTab] = useState<"direct" | "naver" | "youtube" | "image">("direct");
   const [postType, setPostType] = useState<ContentType | "">("");
-  const [ytKw, setYtKw] = useState("");
   const [ytText, setYtText] = useState("");
   const [naverKws, setNaverKws] = useState("");
   const [naverResults, setNaverResults] = useState<{ title: string; link: string; blogger: string; description: string; postdate: string; kw: string }[]>([]);
@@ -321,7 +320,7 @@ function CreateInner() {
           <p className="ws-helper">관련 키워드를 쉼표로 여러 개 입력하면 자동으로 검색해서 참고 글을 모아줍니다. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
           <div className="ws-chips" style={{ marginBottom: 8 }}>{NAVER_EXAMPLES.map(kw => {
             const selected = naverKws.split(",").map(s => s.trim()).includes(kw);
-            return <button key={kw} type="button" aria-pressed={selected} className={`ws-chip ${selected ? "is-active" : ""}`} style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => {
+            return <button key={kw} type="button" aria-pressed={selected} className={`ws-chip ${selected ? "is-active" : ""}`} style={{ fontSize: 11, padding: "4px 8px" }} onClick={() => {
               const cur = naverKws.split(",").map(s => s.trim()).filter(Boolean);
               setNaverKws(selected ? cur.filter(c => c !== kw).join(", ") : [...cur, kw].slice(0, 3).join(", "));
             }}>{kw}</button>;
@@ -337,7 +336,7 @@ function CreateInner() {
         {sourceTab === "youtube" && <div className="ws-form-group ws-stack">
           <span className="ws-label">유튜브에서 찾기</span>
           <p className="ws-helper">키워드로 유튜브 검색을 열고, 영상 설명이나 댓글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
-          <div className="ws-secondary-actions"><input className="ws-input" value={ytKw} onChange={e => setYtKw(e.target.value)} placeholder="검색 키워드 (예: 금니 매입)" aria-label="유튜브 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label><button type="button" className="ws-button" onClick={() => window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(ytKw.trim() || input.trim() || "금매입")}`, "_blank", "noopener")}>유튜브 검색 열기<UiIcon name="external" size={16} /></button></div>
+          <div className="ws-secondary-actions"><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label></div>
           <label className="ws-label" htmlFor="yt-paste">참고 글 붙여넣기 (최대 {refCount}까지 이어 붙이기)</label>
           <textarea id="yt-paste" className="ws-input" rows={5} value={ytText} onChange={e => setYtText(e.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." />
           <button type="button" className="ws-button ws-button-primary" disabled={!ytText.trim()} onClick={() => { const found = (ytText.match(/제목:/g) || []).length; log(found > 1 ? `유튜브 참고글 ${found}개 중 첫 번째 적용` : "유튜브 참고글 적용"); applyPasted(ytText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
