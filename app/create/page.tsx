@@ -37,6 +37,7 @@ const POST_TYPES: { id: string; type: ContentType }[] = [
   { id: "상담 유도형", type: "문의 유도형" },
   { id: "이벤트/안내형", type: "이벤트" },
 ];
+const NAVER_EXAMPLES = ["금니 매입", "돌반지 가격", "오늘 금값", "끊어진 목걸이", "18K 14K 차이", "금 팔때", "보증서 없는 금", "한쪽 귀걸이", "치과 금니", "금테크"];
 const IMAGE_EXAMPLES = [
   { copy: "오늘 금값 확인하세요", bg: "#111111", prompt: "오늘 금값 기준으로 지금 팔아도 되는지 알려주는 글" },
   { copy: "이 작은 조각도 될까요?", bg: "#FF6F0F", prompt: "작은 금 조각도 매입되는지 궁금해하는 고객용 글" },
@@ -318,6 +319,13 @@ function CreateInner() {
         {sourceTab === "naver" && <div className="ws-form-group ws-stack">
           <span className="ws-label">네이버에서 찾기</span>
           <p className="ws-helper">관련 키워드를 쉼표로 여러 개 입력하면 자동으로 검색해서 참고 글을 모아줍니다. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
+          <div className="ws-chips" style={{ marginBottom: 8 }}>{NAVER_EXAMPLES.map(kw => {
+            const selected = naverKws.split(",").map(s => s.trim()).includes(kw);
+            return <button key={kw} type="button" aria-pressed={selected} className={`ws-chip ${selected ? "is-active" : ""}`} style={{ fontSize: 12, padding: "6px 10px" }} onClick={() => {
+              const cur = naverKws.split(",").map(s => s.trim()).filter(Boolean);
+              setNaverKws(selected ? cur.filter(c => c !== kw).join(", ") : [...cur, kw].slice(0, 3).join(", "));
+            }}>{kw}</button>;
+          })}</div>
           <div className="ws-secondary-actions"><input className="ws-input" value={naverKws} onChange={e => setNaverKws(e.target.value)} placeholder="검색 키워드 (예: 금니 매입, 돌반지 가격)" aria-label="네이버 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label><button type="button" className="ws-button ws-button-primary" disabled={naverLoading} onClick={() => void searchNaver()}>{naverLoading ? "검색 중…" : "자동으로 검색하기"}</button></div>
           {naverErr === "no_key" && <div className="ws-note"><UiIcon name="info" size={17} />네이버 키가 아직 없어서 자동 검색이 안 돼요. 발급받는 법: developers.naver.com → 내 애플리케이션 → 검색 API 체크 → 나온 ID·키를 알려주세요. 서버에 등록하면 바로 켜집니다.</div>}
           {naverErr === "failed" && <div className="ws-note ws-note-error">검색에 실패했어요. 잠시 후 다시 시도해 주세요.</div>}
@@ -341,8 +349,8 @@ function CreateInner() {
         <div className="ws-form-group"><label className="ws-label" htmlFor="extra-req">추가 요청 사항</label><textarea id="extra-req" className="ws-input" rows={2} value={extra} onChange={e => setExtra(e.target.value)} placeholder="예) 끝문장은 전화번호로 끝나게, 이모지 빼고" /></div>
         <div className="ws-form-group"><span className="ws-label">어떻게 작성할까요?</span><div className="ws-provider-grid">{PROVIDERS.map(p => <button type="button" key={p.id} aria-pressed={provider === p.id} className={`ws-provider ${provider === p.id ? "is-active" : ""}`} onClick={() => { setProvider(p.id); setShowPaste(false); }}><strong>{p.name}</strong><small>{p.desc}</small></button>)}</div></div>
         <div className="ws-form-group ws-secondary-actions">
-          <div style={{ flex: 1 }}><label className="ws-label" htmlFor="tone-sel">말투</label><select id="tone-sel" className="ws-input" value={toneSel || tone} onChange={e => setToneSel(e.target.value)}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
-          <div style={{ flex: 1 }}><label className="ws-label" htmlFor="len-sel">분량</label><select id="len-sel" className="ws-input" value={lenSel} onChange={e => setLenSel(e.target.value)}>{LENGTHS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+          <div style={{ flex: 1 }}><label htmlFor="tone-sel" style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>말투</label><select id="tone-sel" className="ws-input" style={{ padding: "8px 10px", fontSize: 13 }} value={toneSel || tone} onChange={e => setToneSel(e.target.value)}>{TONES.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+          <div style={{ flex: 1 }}><label htmlFor="len-sel" style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>분량</label><select id="len-sel" className="ws-input" style={{ padding: "8px 10px", fontSize: 13 }} value={lenSel} onChange={e => setLenSel(e.target.value)}>{LENGTHS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
         </div>
         <p className="ws-helper ws-form-group">{brand.businessName} · {tone} <Link href="/brand" className="ws-text-link">매장 정보 확인<UiIcon name="chevron" size={13} /></Link></p>
         <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={busy} onClick={() => void generate()}><UiIcon name="spark" />{busy ? "초안을 만들고 있어요…" : provider === "chatgpt" || provider === "gemini" ? `${hostName} 작성 지시문 만들기` : provider === "template" ? "빠른 초안 만들기" : "사이트 AI로 작성하기"}</button>
