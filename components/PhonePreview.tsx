@@ -9,86 +9,32 @@ export function StatusBadge({ status }: { status: string }) {
     "AI 작성 완료": "bg-violet-50 text-violet-700 border-violet-200",
     "초안": "bg-neutral-100 text-neutral-600 border-neutral-200",
     "작성 필요": "bg-red-50 text-red-600 border-red-200",
-    "보관": "bg-neutral-50 text-neutral-400 border-neutral-200"
+    "보관": "bg-neutral-50 text-neutral-500 border-neutral-200"
   };
-  return <span className={`text-[11px] font-bold border rounded-full px-2 py-0.5 ${map[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}>{status}</span>;
+  return <span className={`inline-flex items-center whitespace-nowrap text-[11px] font-semibold border rounded-full px-2 py-0.5 ${map[status] ?? "bg-neutral-100 text-neutral-600 border-neutral-200"}`}>{status}</span>;
 }
-
 export function TypeBadge({ type }: { type: string }) {
-  return <span className="text-[11px] font-semibold bg-neutral-900 text-white rounded-full px-2 py-0.5">{type}</span>;
+  return <span className="inline-flex text-[11px] font-semibold bg-neutral-100 text-neutral-600 rounded-full px-2 py-0.5">{type}</span>;
 }
-
 export default function PhonePreview({ title, body, bizName, time, imageCopy, imageSub, bg, secondImage, logo, logoText, aiImages }: {
   title: string; body: string; bizName: string; time: string;
   imageCopy: string; imageSub: string; bg: string; secondImage?: { copy: string; bg: string } | null;
   logo?: string | null; logoText?: string; aiImages?: string[];
 }) {
   const [logoOk, setLogoOk] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => { setLogoOk(true); }, [logo]);
-  const showLogo = !!logo && logoOk;
-  return (
-    <div className="phone-frame">
-      <div className="bg-white px-4 pt-3 pb-2 flex items-center gap-2.5 border-b border-neutral-100">
-        {showLogo ? (
-          <img src={logo as string} alt="로고" className="w-10 h-10 rounded-full object-cover border border-neutral-200 bg-white" onError={() => setLogoOk(false)} />
-        ) : (
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-black" style={{ background: bg || "var(--brand)" }}>
-            {bizName.slice(0, 1)}
-          </div>
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-bold truncate">{bizName || "업체명"}</div>
-          <div className="text-[11px] text-neutral-400">{time} · 동네인증 · 소식</div>
-        </div>
-        <span className="text-[11px] text-neutral-400">···</span>
-      </div>
-      {aiImages && aiImages.length > 0 ? (
-        <>
-          <div className="relative aspect-[4/3] bg-neutral-100 overflow-hidden">
-            <img src={aiImages[0]} alt="AI 대표 이미지" className="w-full h-full object-cover" />
-            <div className="absolute bottom-3 right-3 text-[10px] text-white font-bold bg-black/50 rounded-full px-2 py-0.5">1/ {aiImages.length}</div>
-          </div>
-          {aiImages[1] && (
-            <div className="relative aspect-[16/9] bg-neutral-100 overflow-hidden border-t border-neutral-100">
-              <img src={aiImages[1]} alt="AI 이미지 2" className="w-full h-full object-cover" />
-              <div className="absolute top-2 left-3 text-[10px] font-bold text-white bg-black/50 rounded-full px-2 py-0.5">이미지 2</div>
-            </div>
-          )}
-        </>
-      ) : imageCopy ? (
-        <div className="relative aspect-[4/3] flex flex-col items-center justify-center text-center px-6" style={{ background: bg || "#111" }}>
-          {showLogo ? (
-            <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/35 rounded-full pl-1 pr-2.5 py-1">
-              <img src={logo as string} alt="" className="w-6 h-6 rounded-full object-cover bg-white" onError={() => setLogoOk(false)} />
-              <span className="text-[10px] font-bold text-white">{logoText || bizName}</span>
-            </div>
-          ) : (
-            <div className="absolute top-3 left-3 text-[10px] font-bold text-white/70 border border-white/30 rounded-full px-2 py-0.5">대표 이미지</div>
-          )}
-          <div className="text-white font-black leading-tight tracking-tight" style={{ fontSize: imageCopy.length > 12 ? 26 : 32 }}>{imageCopy}</div>
-          {imageSub && <div className="mt-2 text-white/80 text-[12px] font-semibold">{imageSub}</div>}
-          <div className="absolute bottom-3 right-3 text-[10px] text-white/60 font-semibold">1/ {secondImage ? 2 : 1}</div>
-        </div>
-      ) : (
-        <div className="aspect-[4/3] bg-neutral-100 flex items-center justify-center text-neutral-400 text-[13px]">대표 이미지를 생성하세요</div>
-      )}
-      {secondImage && (
-        <div className="relative aspect-[16/9] flex items-center justify-center" style={{ background: secondImage.bg }}>
-          <div className="absolute top-2 left-3 text-[10px] font-bold text-white/70 border border-white/30 rounded-full px-2 py-0.5">이미지 2</div>
-          <div className="text-white font-extrabold text-[18px] px-6 text-center">{secondImage.copy}</div>
-        </div>
-      )}
-      <div className="px-4 py-3.5">
-        <div className="text-[15px] font-extrabold tracking-tight leading-snug">{title || "제목이 여기에 표시됩니다"}</div>
-        <div className="mt-2 text-[13px] text-neutral-700 leading-relaxed whitespace-pre-wrap line-clamp-[12]">{body || "본문이 여기에 표시됩니다. AI가 생성한 글이 실시간으로 반영됩니다."}</div>
-        <div className="mt-3 flex gap-2">
-          <span className="flex-1 text-center text-[13px] font-bold rounded-xl py-2.5 text-white" style={{ background: "var(--brand)" }}>채팅하기</span>
-          <span className="flex-1 text-center text-[13px] font-bold rounded-xl py-2.5 border border-neutral-200">전화하기</span>
-        </div>
-        <div className="mt-2.5 flex items-center gap-3 text-[12px] text-neutral-400">
-          <span>♡ 관심 12</span><span>💬 문의 4</span><span className="ml-auto">공유하기</span>
-        </div>
-      </div>
+  return <div className="phone-frame">
+    <div className="bg-white px-4 pt-4 pb-3 flex items-center gap-2.5 border-b border-neutral-100">
+      {logo && logoOk ? <img src={logo} alt={logoText || "매장 로고"} className="w-10 h-10 rounded-full object-cover border border-neutral-200" onError={() => setLogoOk(false)} /> : <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ background: bg || "#302c25" }}>{bizName.slice(0, 1)}</div>}
+      <div className="flex-1 min-w-0"><div className="text-[13px] font-bold truncate">{bizName || "업체명"}</div><div className="text-[11px] text-neutral-500 mt-1">{time} · 소식</div></div>
     </div>
-  );
+    {aiImages?.length ? aiImages.map((url, i) => <div key={`${i}-${url.slice(-20)}`} className="relative aspect-[4/3] bg-neutral-100 overflow-hidden"><img src={url} alt={`소식 이미지 ${i + 1}`} className="w-full h-full object-cover" /><span className="absolute bottom-3 right-3 text-[11px] text-white bg-black/50 rounded-full px-2 py-0.5">{i + 1} / {aiImages.length}</span></div>) : imageCopy ? <div className="aspect-[4/3] flex flex-col items-center justify-center text-center p-6 text-white" style={{ background: bg || "#302c25" }}><strong className="text-[26px] font-extrabold leading-snug">{imageCopy}</strong><span className="mt-2 text-[13px] opacity-80">{imageSub}</span></div> : null}
+    {secondImage && !aiImages?.length && <div className="aspect-[16/9] flex items-center justify-center text-white text-center p-6" style={{ background: secondImage.bg }}>{secondImage.copy}</div>}
+    <div className="px-4 py-4"><h3 className="text-[16px] font-bold leading-snug">{title || "소식 제목"}</h3><div className={`mt-3 text-[14px] text-neutral-700 leading-relaxed whitespace-pre-wrap ${expanded ? "" : "line-clamp-[12]"}`}>{body || "본문을 작성해 주세요."}</div>
+      {body.length > 300 && <button type="button" className="ws-text-link" onClick={() => setExpanded(!expanded)}>{expanded ? "접기" : "본문 전체 보기"}</button>}
+      <div className="mt-4 flex gap-2" aria-hidden="true"><span className="flex-1 text-center text-[13px] font-bold rounded-xl py-2.5 text-white" style={{ background: bg || "#302c25" }}>채팅하기</span><span className="flex-1 text-center text-[13px] font-bold rounded-xl py-2.5 border border-neutral-200">전화하기</span></div>
+      <p className="mt-3 text-[11px] text-neutral-500 text-center">미리보기예요. 실제 발행·문의·반응 수는 표시하지 않아요.</p>
+    </div>
+  </div>;
 }
