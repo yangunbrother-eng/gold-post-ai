@@ -10,9 +10,11 @@ const TABS: { href: string; label: string; icon: IconName; ariaLabel?: string }[
   { href: "/create", label: "소식 만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
   { href: "/trends", label: "유튜브", icon: "youtube", ariaLabel: "유튜브에서 주제 찾기" },
   { href: "/library", label: "보관함", icon: "folder" },
-  { href: "/calendar", label: "캘린더", icon: "calendar" },
+  { href: "/ads", label: "광고 분석", icon: "trend" },
 ];
 const MENUS: { href: string; label: string; desc: string; icon: IconName }[] = [
+  { href: "/ads", label: "광고 분석", desc: "당근 광고 MCP · 광고비와 소재 성과 비교", icon: "trend" },
+  { href: "/calendar", label: "캘린더", desc: "소식 발행 예정일 관리", icon: "calendar" },
   { href: "/recommend", label: "추천 주제", desc: "다음 글의 아이디어 찾기", icon: "sparkles" },
   { href: "/trends", label: "유튜브에서 주제 찾기", desc: "영상 검색 · 제목과 댓글 분석", icon: "youtube" },
   { href: "/create#images", label: "소식 이미지", desc: "작성한 글에 이미지 더하기", icon: "image" },
