@@ -1,175 +1,55 @@
 "use client";
 import Link from "next/link";
 import { useMemo } from "react";
-import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
-import { StatusBadge, TypeBadge } from "@/components/PhonePreview";
+import UiIcon, { type IconName } from "@/components/UiIcon";
+import { StatusBadge } from "@/components/PhonePreview";
 import { useBrand, useContents, todayStr } from "@/lib/store";
 
-const QUICK_TOPICS = ["오늘의 시세", "고객 후기", "영업 안내", "FAQ"];
-
+const TOPICS: { label: string; desc: string; topic: string; icon: IconName }[] = [
+  { label: "오늘의 시세", desc: "확인한 시세를 쉽게 알려요", topic: "오늘 확인한 금 매입 시세를 안내하는 글. 확인하지 않은 금액은 만들어 쓰지 말고 입력할 자리로 남겨줘.", icon: "spark" },
+  { label: "고객이 자주 묻는 질문", desc: "방문 전 궁금증을 풀어줘요", topic: "금 매입 상담 전 고객이 준비할 것과 자주 묻는 질문을 안내해줘.", icon: "info" },
+  { label: "매장 방문 안내", desc: "위치와 연락 방법을 알려요", topic: "우리 매장에 처음 방문하는 고객을 위한 위치와 연락 방법 안내", icon: "shop" },
+  { label: "매입 사례 소개", desc: "실제 사례를 소식으로 만들어요", topic: "실제 금 매입 사례를 소개하는 글. 고객 사연이나 거래 금액은 꾸미지 말고 내가 채울 자리로 남겨줘.", icon: "edit" },
+];
 export default function Dashboard() {
-  const { items } = useContents();
+  const { items, loaded } = useContents();
   const { brand } = useBrand();
   const today = todayStr();
-
-  const stats = useMemo(() => {
-    const weekAgo = Date.now() - 7 * 864e5;
-    return {
-      todayMade: items.filter((i) => i.createdAt === today).length,
-      needReview: items.filter((i) => i.status === "AI 작성 완료").length,
-      reserved: items.filter((i) => i.status === "발행 예정").length,
-      weekMade: items.filter((i) => new Date(i.createdAt).getTime() >= weekAgo).length,
-    };
-  }, [items, today]);
-
-  const todos = [
-    { label: `오늘 발행 예정`, count: items.filter((i) => i.date === today && (i.status === "발행 예정" || i.status === "검수 완료")).length, action: "/calendar" },
-    { label: `작성 필요`, count: items.filter((i) => i.status === "작성 필요").length, action: "/calendar" },
-    { label: `검수 대기`, count: items.filter((i) => i.status === "AI 작성 완료").length, action: "/library" },
-  ];
-
-  const trends = ["금값 상승", "돌반지", "지금 팔아야 하나", "18K 매입", "금테크"];
-
-  const recommends = [
-    { t: "고객 후기", d: "최근 후기 글이 적습니다", ex: "“여기서 팔길 잘했어요” 실제 방문 후기" },
-    { t: "FAQ", d: "“이것도 되나요?” 반복 질문", ex: "많이 묻는 질문 3가지" },
-    { t: "시세", d: "금값 변동이 큽니다", ex: "오늘 금값, 지금 팔아도 될까요?" },
-    { t: "방문 유도", d: "주말 방문 유도 타이밍", ex: "처음 오시는 분 필독! 주차 안내" },
-  ];
-
-  return (
-    <div className="min-h-screen flex">
-      <Sidebar bizName={brand.businessName} extConnected={false} />
-      <div className="flex-1 min-w-0">
-        <Topbar title="Dashboard" sub="오늘 당근 업무를 한눈에" />
-        <main className="mx-auto py-5 space-y-4">
-
-          {/* 히어로 — 인사 + 핵심 액션 + 빠른 주제 */}
-          <section className="rounded-2xl p-5 text-white animate-fadeUp overflow-hidden relative" style={{ background: "linear-gradient(135deg,#241B10 0%,#3A2C18 60%,#4d3a1e 100%)", border: "1px solid #C9A22733" }}>
-            <div className="absolute -right-10 -top-16 text-[160px] leading-none opacity-[0.07] select-none pointer-events-none">金</div>
-            <div className="flex flex-wrap items-start justify-between gap-3 relative">
-              <div>
-                <div className="text-[12px] font-semibold tracking-[0.14em]" style={{ color: "#D8BC6A" }}>{today} · {brand.businessName}</div>
-                <h2 className="mt-1 text-[20px] font-black tracking-tight leading-snug">오늘 당근에 어떤 소식을 올릴까요?</h2>
-              </div>
-              <Link href="/create" className="btn-gold text-[13px] font-bold px-5 py-2.5 w-full text-center shrink-0">✦ AI 소식 만들기</Link>
-            </div>
-            <div className="mt-4 flex flex-wrap gap-1.5 relative">
-              {QUICK_TOPICS.map((t) => (
-                <Link key={t} href={`/create?topic=${encodeURIComponent(t)}`}
-                  className="rounded-lg px-3 py-1.5 text-[12px] font-semibold transition hover:bg-white/20" style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(216,188,106,0.35)", color: "#F3E9D2" }}>{t}</Link>
-              ))}
-            </div>
-          </section>
-
-          {/* 핵심 숫자 — 4개로 압축 */}
-          <section className="card px-5 py-4 grid grid-cols-2 gap-3">
-            {[
-              ["오늘 생성", stats.todayMade],
-              ["검수 대기", stats.needReview],
-              ["발행 예정", stats.reserved],
-              ["이번 주 작성", stats.weekMade],
-            ].map(([l, v]) => (
-              <div key={l as string}>
-                <div className="label">{l}</div>
-                <div className="text-[22px] font-black tracking-tight mt-0.5">{v}<span className="text-[12px] font-semibold text-neutral-400 ml-1">건</span></div>
-              </div>
-            ))}
-          </section>
-
-          <div className="space-y-4">
-            <div className="space-y-5 min-w-0">
-              {/* 추천 주제 — 2x2 */}
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">✦ 오늘 추천 주제</h3>
-                  <Link href="/recommend" className="text-[12px] font-bold text-neutral-400 hover:text-black">전체 보기 →</Link>
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-2.5">
-                  {recommends.map((r) => (
-                    <div key={r.t} className="rounded-xl border border-neutral-200 p-4 hover:border-neutral-400 transition">
-                      <div className="flex items-center gap-2">
-                        <TypeBadge type={r.t} />
-                        <span className="text-[12px] text-neutral-500">{r.d}</span>
-                      </div>
-                      <div className="mt-2 text-[13px] font-bold tracking-tight leading-snug">“{r.ex}”</div>
-                      <Link href={`/create?topic=${encodeURIComponent(r.ex)}`} className="mt-2.5 inline-block text-[12px] font-bold btn-ghost px-3 py-1.5">바로 만들기 →</Link>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* 최근 콘텐츠 */}
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">최근 콘텐츠</h3>
-                  <Link href="/history" className="text-[12px] font-bold text-neutral-400 hover:text-black">이력 전체 →</Link>
-                </div>
-                <div className="mt-2 divide-y divide-neutral-100">
-                  {items.slice(0, 5).map((c) => (
-                    <div key={c.id} className="py-2.5 flex items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-bold truncate">{c.title}</div>
-                        <div className="text-[12px] text-neutral-400 mt-0.5">{c.date} <span className="dot" />{c.type}</div>
-                      </div>
-                      <StatusBadge status={c.status} />
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            {/* 우측 rail */}
-            <div className="space-y-5">
-              <section className="card p-5">
-                <h3 className="text-[15px] font-extrabold tracking-tight">오늘 해야 할 일</h3>
-                <div className="mt-3 space-y-1">
-                  {todos.map((t) => (
-                    <Link key={t.label} href={t.action} className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-neutral-50 transition">
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${t.count > 0 ? "bg-[var(--brand)]" : "bg-neutral-200"}`} />
-                      <span className="text-[13px] font-semibold flex-1">{t.label}</span>
-                      <span className="text-[13px] font-black">{t.count}건</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">콘텐츠 트렌드</h3>
-                  <Link href="/trends" className="text-[12px] font-bold text-neutral-400 hover:text-black">분석 →</Link>
-                </div>
-                <div className="mt-3 space-y-1">
-                  {trends.map((t, i) => (
-                    <Link key={t} href={`/create?topic=${encodeURIComponent(t + " 관련 당근 소식")}`}
-                      className="flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-neutral-50 transition">
-                      <span className="text-[12px] font-black text-neutral-300 w-4">{i + 1}</span>
-                      <span className="text-[13px] font-semibold flex-1 truncate">#{t}</span>
-                      <span className="text-[12px] font-bold text-neutral-400">→</span>
-                    </Link>
-                  ))}
-                </div>
-              </section>
-
-              <section className="card p-5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-[15px] font-extrabold tracking-tight">이번 주 예약 플랜</h3>
-                  <Link href="/calendar" className="text-[12px] font-bold text-neutral-400 hover:text-black">캘린더 →</Link>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-1.5">
-                  {[["월", "금 시세"], ["화", "고객 후기"], ["수", "정보 콘텐츠"], ["목", "FAQ"], ["금", "매입 사례"], ["토", "방문 유도"]].map(([d, t]) => (
-                    <div key={d} className="flex items-center gap-2 rounded-lg bg-neutral-50 border border-neutral-100 px-2.5 py-2">
-                      <span className="text-[12px] font-black text-neutral-400">{d}</span>
-                      <span className="text-[12px] font-semibold truncate">{t}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </div>
-        </main>
-      </div>
-    </div>
-  );
+  const stats = useMemo(() => ({
+    draft: items.filter((i) => ["초안", "작성 필요"].includes(i.status)).length,
+    review: items.filter((i) => i.status === "AI 작성 완료").length,
+    planned: items.filter((i) => i.status === "발행 예정").length,
+  }), [items]);
+  const recent = useMemo(() => [...items].filter((i) => i.status !== "보관").sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 3), [items]);
+  const pending = stats.draft + stats.review;
+  return <div className="ws-app"><Topbar title="" />
+    <main className="ws-main">
+      <section className="ws-hero">
+        <div className="ws-eyebrow"><span className="ws-live-dot" />우리 매장 소식 작업실 <span className="ws-date">{today.replaceAll("-", ".")}</span></div>
+        <h1>오늘의 소식,<br /><span>가볍게 시작하세요.</span></h1>
+        <p>{brand.businessName || "우리 매장"}의 이야기를<br />주제 찾기부터 발행 준비까지, 한곳에서.</p>
+        <Link href="/create" className="ws-button ws-button-primary ws-button-wide"><UiIcon name="spark" />새 소식 작성하기<UiIcon name="arrow" /></Link>
+        <div className="ws-hero-bottom"><span>주제 선택</span><UiIcon name="chevron" size={13} /><span>글·이미지 만들기</span><UiIcon name="chevron" size={13} /><span>확인 후 발행</span></div>
+      </section>
+      <section aria-label="콘텐츠 현황" className="ws-stats">
+        {[
+          { label: "작성 중", n: stats.draft, status: "초안", icon: "edit" as const },
+          { label: "검수 대기", n: stats.review, status: "AI 작성 완료", icon: "check" as const },
+          { label: "발행 예정", n: stats.planned, status: "발행 예정", icon: "calendar" as const },
+        ].map((s) => <Link key={s.label} href={`/library?status=${encodeURIComponent(s.status)}`} className="ws-stat"><span><UiIcon name={s.icon} size={16} />{s.label}</span><strong>{loaded ? s.n : "—"}<small>건</small></strong></Link>)}
+      </section>
+      {loaded && pending > 0 && <Link className="ws-reminder" href={`/library?status=${encodeURIComponent(stats.review ? "AI 작성 완료" : "초안")}`}><span className="ws-tile-icon"><UiIcon name="clock" /></span><span><strong>이어서 마무리할 글이 {pending}개 있어요</strong><small>작성한 글을 확인하고 다음 단계로 넘어가세요.</small></span><UiIcon name="chevron" size={18} /></Link>}
+      <section className="ws-section">
+        <div className="ws-section-head"><div><div className="ws-eyebrow">무엇을 쓸지 고민될 때</div><h2>이런 소식은 어때요?</h2></div><Link href="/trends" className="ws-text-link">주제 찾기<UiIcon name="arrow" size={16} /></Link></div>
+        <div className="ws-topic-grid">{TOPICS.map((t, i) => <Link key={t.label} href={`/create?topic=${encodeURIComponent(t.topic)}`} className={`ws-topic-card ws-topic-${i}`}><span className="ws-tile-icon"><UiIcon name={t.icon} size={23} /></span><strong>{t.label}</strong><p>{t.desc}</p><span className="ws-topic-action">이 주제로 쓰기<UiIcon name="arrow" size={16} /></span></Link>)}</div>
+      </section>
+      <section className="ws-section">
+        <div className="ws-section-head"><div><div className="ws-eyebrow">내 콘텐츠</div><h2>최근 작성한 소식</h2></div><Link href="/library" className="ws-text-link">전체 보기<UiIcon name="arrow" size={16} /></Link></div>
+        <div className="ws-panel ws-recent-list">{!loaded ? <p className="ws-empty" role="status">저장한 소식을 불러오고 있어요.</p> : recent.length ? recent.map((c) => <Link href={`/create?id=${encodeURIComponent(c.id)}`} key={c.id} className="ws-recent-item"><span className="ws-recent-icon"><UiIcon name={c.status === "발행됨" ? "check" : "edit"} /></span><span className="ws-recent-copy"><strong>{c.title || "제목 없는 소식"}</strong><small>{c.createdAt} · {c.type}</small><StatusBadge status={c.status} /></span><UiIcon name="chevron" size={18} /></Link>) : <div className="ws-empty"><UiIcon name="edit" size={30} /><h3>첫 소식을 만들어 볼까요?</h3><p>작성한 글은 이곳에서 다시 이어 쓸 수 있어요.</p><Link href="/create" className="ws-text-link">첫 소식 쓰기<UiIcon name="arrow" size={16} /></Link></div>}</div>
+      </section>
+      <Link href="/brand" className="ws-brand-hint"><UiIcon name="shop" /><span><strong>우리 매장답게 쓰려면</strong><small>연락처와 매장 소개를 먼저 확인해 주세요.</small></span><UiIcon name="arrow" size={18} /></Link>
+      <p className="ws-storage-note"><UiIcon name="info" size={15} />작성한 글은 이 브라우저에 저장돼요. PC·모바일 간 자동 동기화는 아직 지원하지 않아요.</p>
+    </main>
+  </div>;
 }

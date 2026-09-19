@@ -1,195 +1,72 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useBrand } from "@/lib/store";
+import UiIcon, { type IconName } from "./UiIcon";
 
-const QUICK_TABS = [
-  { href: "/", label: "홈" },
-  { href: "/create", label: "✦ 만들기" },
-  { href: "/trends", label: "🔥 트렌드" },
-  { href: "/recommend", label: "오늘 추천" },
-  { href: "/calendar", label: "캘린더" },
-  { href: "/library", label: "보관함" },
-  { href: "/templates", label: "템플릿" },
-  { href: "/history", label: "발행 이력" },
-  { href: "/brand", label: "브랜드" },
-  { href: "/settings", label: "설정" },
+const MAIN: { href: string; label: string; icon: IconName }[] = [
+  { href: "/", label: "홈", icon: "home" },
+  { href: "/trends", label: "주제 찾기", icon: "search" },
+  { href: "/create", label: "소식 쓰기", icon: "plus" },
+  { href: "/calendar", label: "일정", icon: "calendar" },
+  { href: "/library", label: "보관함", icon: "library" },
 ];
-
-const FULL_MENUS = [
-  { href: "/", label: "Dashboard", icon: "◧", desc: "오늘 할 일" },
-  { href: "/create", label: "당근 소식 만들기", icon: "✦", desc: "AI 작성", hot: true },
-  { href: "/recommend", label: "오늘 추천", icon: "✿", desc: "5 picks" },
-  { href: "/trends", label: "인기 주제 찾기", icon: "🔥", desc: "YouTube 분석" },
-  { href: "/create#images", label: "소식 이미지", icon: "◫", desc: "글속성 생성" },
-  { href: "/calendar", label: "콘텐츠 캘린더", icon: "▦", desc: "예약 관리" },
-  { href: "/library", label: "콘텐츠 보관함", icon: "▤", desc: "검색 및 재활용" },
-  { href: "/templates", label: "템플릿", icon: "⧉", desc: "형식 저장" },
-  { href: "/history", label: "발행 이력", icon: "↗", desc: "기록" },
-  { href: "/brand", label: "브랜드 설정", icon: "●", desc: "업체 정보" },
-  { href: "/settings", label: "설정", icon: "⚙", desc: "말투·지점·확장" },
+const MORE: { href: string; label: string; desc: string; icon: IconName }[] = [
+  { href: "/recommend", label: "추천 주제", desc: "어떤 글을 쓸지 막막할 때", icon: "spark" },
+  { href: "/templates", label: "글 템플릿", desc: "자주 쓰는 글 형식", icon: "copy" },
+  { href: "/create?section=images", label: "소식 이미지", desc: "글에 어울리는 이미지 만들기", icon: "image" },
+  { href: "/history", label: "발행 이력", desc: "등록해 둔 발행 기록", icon: "clock" },
+  { href: "/brand", label: "매장 정보", desc: "업체명 · 연락처 · 로고", icon: "shop" },
+  { href: "/settings", label: "설정 및 연결", desc: "말투 · 지점 · 확장 프로그램", icon: "settings" },
 ];
 
 export default function Topbar({ title, sub }: { title: string; sub?: string }) {
   const path = usePathname();
   const { brand, branches, activeBranchId, switchBranch } = useBrand();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-
-  // 페이지 이동 시 드로어 자동 닫기
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [path]);
-
-  return (
-    <header className="sticky top-0 z-40 border-b backdrop-blur" style={{ background: "rgba(250,246,238,0.95)", borderColor: "#E7DCC4" }}>
-      {/* 1열: 브랜드 로고 + 지점 표시 + 햄버거 버튼 */}
-      <div className="px-4 py-2.5 flex items-center justify-between gap-2">
-        <Link href="/" className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-white font-black text-sm shrink-0" style={{ background: "linear-gradient(135deg,#C9A227,#8a6a24)" }}>
-            🥕
-          </div>
-          <div className="min-w-0">
-            <div className="tracking-tight text-[15px] leading-tight flex items-center gap-1.5" style={{ fontFamily: "'Noto Serif KR',serif", fontWeight: 900 }}>
-              <span>당근 Post AI</span>
-            </div>
-            <div className="text-[11px] truncate leading-none mt-0.5" style={{ color: "var(--gold)" }}>
-              {brand.businessName || "내 비즈니스"}
-            </div>
-          </div>
+  const dialog = useRef<HTMLDialogElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const overflow = useRef<string | null>(null);
+  const restoreScroll = () => {
+    if (overflow.current !== null) document.body.style.overflow = overflow.current;
+    overflow.current = null;
+  };
+  const close = () => { dialog.current?.close(); restoreScroll(); trigger.current?.focus(); };
+  useEffect(() => { dialog.current?.close(); restoreScroll(); }, [path]);
+  useEffect(() => () => restoreScroll(), []);
+  const open = () => {
+    overflow.current = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.current?.showModal();
+  };
+  return <>
+    <a href="#workspace-content" className="ws-skip">본문으로 바로가기</a>
+    <header className="ws-topbar">
+      <div className="ws-topbar-inner">
+        <Link href="/" className="ws-brand" aria-label="당근 Post AI 홈">
+          <span className="ws-brand-mark"><UiIcon name="spark" size={22} /></span>
+          <span><strong>당근 Post <span className="ws-gold">AI</span></strong><small>{brand.businessName || "내 매장"}</small></span>
         </Link>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <Link href="/create" className="btn-primary text-[11.5px] font-bold px-3 py-1.5 rounded-lg flex items-center gap-1">
-            <span>✦ 작성</span>
-          </Link>
-          <button
-            onClick={() => setDrawerOpen(!drawerOpen)}
-            aria-label="전체 메뉴 열기"
-            className="w-9 h-9 rounded-xl border border-neutral-200 bg-white flex items-center justify-center text-neutral-700 hover:bg-neutral-50 transition text-[15px] font-bold"
-          >
-            {drawerOpen ? "✕" : "☰"}
-          </button>
-        </div>
+        <button ref={trigger} type="button" className="ws-icon-button" onClick={open} aria-label="전체 메뉴 및 매장 전환" aria-haspopup="dialog"><UiIcon name="menu" /></button>
       </div>
-
-      {/* 2열: 부드러운 가로 스크롤 탭 메뉴 */}
-      <nav className="px-4 py-1 flex gap-0.5 overflow-x-auto no-scrollbar border-t text-[11.5px] font-semibold" style={{ borderColor: "#EFE6D2", background: "rgba(243,233,210,0.5)" }}>
-        {QUICK_TABS.map((t) => {
-          const active = path === t.href;
-          return (
-            <Link
-              key={t.href}
-              href={t.href}
-              className="px-3 py-1 rounded-lg whitespace-nowrap transition"
-              style={active
-                ? { background: "var(--brand)", color: "#F7F1E3", fontWeight: 800 }
-                : { color: "var(--ink-soft)" }}
-            >
-              {t.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* 3열: 페이지 타이틀 (지정된 경우에만 표시) */}
-      {title && (
-        <div className="px-4 py-2.5 border-t border-neutral-100 bg-white">
-          <div className="text-[16px] font-extrabold tracking-tight">{title}</div>
-          {sub && <div className="text-[12px] text-neutral-400 mt-0.5">{sub}</div>}
-        </div>
-      )}
-
-      {/* 모바일 전체 메뉴 슬라이드 드로어 */}
-      {drawerOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-fadeUp"
-          onClick={() => setDrawerOpen(false)}
-        >
-          <div
-            className="w-[min(320px,88vw)] h-full bg-white shadow-2xl flex flex-col p-5 overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white font-black text-xs" style={{ background: "var(--brand)" }}>
-                  🥕
-                </div>
-                <span className="font-black text-[15px]">전체 메뉴</span>
-              </div>
-              <button
-                onClick={() => setDrawerOpen(false)}
-                className="w-8 h-8 rounded-lg bg-neutral-100 text-neutral-600 flex items-center justify-center font-bold text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* 사업장 전환 셀렉터 */}
-            <div className="mt-4 rounded-xl bg-neutral-900 text-white p-3">
-              <div className="text-[11.5px] opacity-70">현재 사업장 · 전환</div>
-              <select
-                value={activeBranchId}
-                onChange={(e) => switchBranch(e.target.value)}
-                className="mt-1.5 w-full bg-white/10 rounded-lg text-[12.5px] font-bold px-2.5 py-1.5 outline-none cursor-pointer hover:bg-white/15 transition [&>option]:text-black"
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* 전체 메뉴 링크 */}
-            <nav className="mt-4 flex-1 space-y-1">
-              {FULL_MENUS.map((m) => {
-                const active = path === m.href;
-                if (m.hot) {
-                  return (
-                    <Link
-                      key={m.href}
-                      href={m.href}
-                      onClick={() => setDrawerOpen(false)}
-                      className="block rounded-xl px-3.5 py-2.5 text-white font-bold transition my-1.5"
-                      style={{ background: "var(--brand)" }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{m.icon}</span>
-                        <span className="text-[13.5px]">{m.label}</span>
-                        <span className="ml-auto text-[10px] bg-white/30 rounded-full px-2 py-0.5">핵심</span>
-                      </div>
-                    </Link>
-                  );
-                }
-                return (
-                  <Link
-                    key={m.href}
-                    href={m.href}
-                    onClick={() => setDrawerOpen(false)}
-                    className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-medium transition ${
-                      active ? "bg-neutral-900 text-white font-bold" : "text-neutral-600 hover:bg-neutral-100"
-                    }`}
-                  >
-                    <span className="w-5 text-center text-[14px]">{m.icon}</span>
-                    <span>{m.label}</span>
-                    {m.desc && <span className="ml-auto text-[11px] text-neutral-400">{m.desc}</span>}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            {/* 하단 링크 */}
-            <div className="pt-4 border-t border-neutral-100">
-              <Link
-                href="/settings#extension"
-                onClick={() => setDrawerOpen(false)}
-                className="block text-center rounded-xl bg-neutral-50 border border-neutral-200 py-2.5 text-[12px] font-bold text-neutral-600 hover:bg-neutral-100 transition"
-              >
-                ⚙ Chrome 확장 프로그램 연동 가이드
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </header>
-  );
+    {path !== "/" && title && <div className="ws-page-heading"><h1>{title === "Dashboard" ? "홈" : title}</h1>{sub && <p>{sub}</p>}</div>}
+    <span id="workspace-content" className="ws-anchor" tabIndex={-1} />
+    <nav className="ws-bottom-nav" aria-label="주 메뉴">
+      {MAIN.map((item) => {
+        const active = path === item.href || (item.href === "/trends" && path === "/recommend");
+        return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`ws-nav-item ${active ? "is-active" : ""} ${item.href === "/create" ? "ws-nav-create" : ""}`}>
+          <span className="ws-nav-icon"><UiIcon name={item.icon} size={21} /></span><span>{item.label}</span>
+        </Link>;
+      })}
+    </nav>
+    <dialog ref={dialog} className="ws-menu-dialog" aria-labelledby="workspace-menu-title" onCancel={restoreScroll} onClose={restoreScroll} onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+      <div className="ws-menu-content">
+        <div className="ws-section-head"><h2 id="workspace-menu-title">전체 메뉴</h2><button type="button" className="ws-icon-button" aria-label="메뉴 닫기" onClick={close}><UiIcon name="close" /></button></div>
+        <div className="ws-branch-card"><label htmlFor="workspace-branch">현재 매장</label><select id="workspace-branch" value={activeBranchId} onChange={(e) => switchBranch(e.target.value)}>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select><Link href="/brand" onClick={close}>매장 정보 수정 <UiIcon name="arrow" size={16} /></Link></div>
+        <nav aria-label="추가 메뉴">{MORE.map((item) => <Link key={item.href} href={item.href} className="ws-menu-link" onClick={close}><span className="ws-tile-icon"><UiIcon name={item.icon} /></span><span><strong>{item.label}</strong><small>{item.desc}</small></span><UiIcon name="chevron" size={17} /></Link>)}</nav>
+        <p className="ws-storage-note"><UiIcon name="info" size={16} />저장한 글과 설정은 이 브라우저에 보관돼요.</p>
+      </div>
+    </dialog>
+  </>;
 }
