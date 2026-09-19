@@ -7,6 +7,8 @@ export type PastedPost = { title: string; body: string };
 const EMPTY: PastedPost = { title: "", body: "" };
 type Section = "title" | "body" | "tags";
 const TAG = /#[^\s#]+/g;
+// Construct dynamically to stay compatible with the app's ES5 TypeScript target.
+const PROSE = new RegExp("[\\p{L}\\p{N}]", "u");
 
 function normalize(text: string): string {
   return text.replace(/\r\n?/g, "\n").replace(/[\u2028\u2029]/g, "\n")
@@ -22,7 +24,7 @@ function cleanTitle(text: string): string {
 }
 function hasProse(text: string): boolean {
   const prose = text.replace(TAG, "").replace(/(?:^|\n)\s*(?:해시태그|hashtags?|태그)\s*[:：]?/gi, "");
-  return /[\p{L}\p{N}]/u.test(prose);
+  return PROSE.test(prose);
 }
 function compact(lines: string[]): string {
   return lines.join("\n").trim();
