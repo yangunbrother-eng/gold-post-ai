@@ -48,28 +48,5 @@ export function openHostAi(host: "chatgpt" | "gemini", prompt: string) {
   document.body.removeChild(a);
 }
 
-// GPT가 써준 결과물을 제목/본문으로 나눔
-export function splitPasted(text: string): { title: string; body: string } {
-  const lines = text
-    .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean);
-  if (!lines.length) return { title: "", body: "" };
-  let title = "";
-  let start = 0;
-  const titleIdx = lines.findIndex((l) => /^제목\s*[:：]/.test(l));
-  if (titleIdx >= 0) {
-    title = lines[titleIdx]
-      .replace(/^제목\s*[:：]\s*/, "")
-      .replace(/^["“]|["”]$/g, "")
-      .trim();
-    start = titleIdx + 1;
-    // "본문:" 마커 줄은 건너뜀
-    if (start < lines.length && /^본문\s*[:：]?\s*$/.test(lines[start])) start += 1;
-  } else {
-    title = lines[0].replace(/^#+\s*/, "").replace(/^["“]|["”]$/g, "").trim();
-    start = 1;
-  }
-  const body = lines.slice(start).join("\n").trim();
-  return { title, body };
-}
+// Preserve the shared importer API used by the composer.
+export { splitPasted } from "./pasted-post";
