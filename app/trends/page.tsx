@@ -6,7 +6,7 @@ import Topbar from "@/components/Topbar";
 import { useBrand, useContents } from "@/lib/store";
 import {
   TrendVideo, VideoMetrics, analyzeTitle, analyzeComments, buildCarrotTitles, carrotTitleFrom,
-  fmtNum, loadKeywords, recommendScore, saveKeywords, scoreVideo, CarrotTitle, CommentInsight
+  fmtNum, loadKeywords, recommendScore, saveKeywords, scoreVideo, CarrotTitle, CommentInsight, YTComment
 } from "@/lib/trends";
 
 type SortMode = "views" | "recent" | "engaged" | "rising";
@@ -65,7 +65,7 @@ export default function TrendsPage() {
   const [top10, setTop10] = useState<CarrotTitle[] | null>(null);
   const [mixingComments, setMixingComments] = useState(false);
   const [cOpen, setCOpen] = useState<string | null>(null);
-  const [cData, setCData] = useState<Record<string, { loading: boolean; insights?: CommentInsight[]; keywords?: { w: string; n: number }[]; demo?: boolean; disabled?: boolean }>>({});
+  const [cData, setCData] = useState<Record<string, { loading: boolean; insights?: CommentInsight[]; keywords?: { w: string; n: number }[]; comments?: YTComment[]; demo?: boolean; disabled?: boolean }>>({});
   const [toast, setToast] = useState("");
   const say = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1700); };
   const [gold, setGold] = useState<{ sell: number; date: string } | null>(null);
@@ -87,10 +87,12 @@ export default function TrendsPage() {
       const r = await fetch(`/api/youtube/comments?videoId=${m.videoId}`);
       const j = await r.json();
       if (j.disabled) { setCData((p) => ({ ...p, [m.videoId]: { loading: false, disabled: true } })); return; }
-      const a = analyzeComments(j.comments ?? []);
-      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: a.insights, keywords: a.keywords, demo: j.demo } }));
+      const list = (j.comments ?? []) as YTComment[];
+      const a = analyzeComments(list);
+      const top = [...list].sort((x, y) => y.likes - x.likes).slice(0, 10);
+      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: a.insights, keywords: a.keywords, comments: top, demo: j.demo } }));
     } catch {
-      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: [], keywords: [] } }));
+      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: [], keywords: [], comments: [] } }));
     }
   };
 
@@ -322,8 +324,21 @@ export default function TrendsPage() {
                                   <Link href={`/create?topic=${encodeURIComponent(ins.title)}`} className="text-[11.5px] font-bold rounded-lg px-3 py-1.5 text-white shrink-0" style={{ background: "var(--brand)" }}>소식 만들기 →</Link>
                                 </div>
                               ))}
-                              {(cd.insights ?? []).length === 0 && <div className="text-[12.5px] text-neutral-400">질문형 댓글이 없습니다.</div>}
+                              {(cd.insights ?? []).length === 0 && (cd.comments ?? []).length === 0 && <div className="text-[12.5px] text-neutral-400">질문형 댓글이 없습니다.</div>}
                             </div>
+                            {(cd.comments ?? []).length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-[12px] font-black text-neutral-600">👍 좋아요 순 댓글 최대 10개</div>
+                                <div className="mt-1.5 space-y-1.5">
+                                  {(cd.comments ?? []).map((c, i) => (
+                                    <div key={`${c.author}${i}`} className="rounded-xl bg-white border border-neutral-200 px-3.5 py-2.5">
+                                      <div className="text-[11.5px] font-bold text-neutral-500">{i + 1}. {c.author} <span className="font-semibold">· 👍 {c.likes}</span></div>
+                                      <div className="text-[13px] text-neutral-700 mt-0.5 leading-relaxed">{c.text.length > 120 ? c.text.slice(0, 120) + "…" : c.text}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
