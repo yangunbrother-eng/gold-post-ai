@@ -21,11 +21,11 @@ export interface SavedImage { id: string; label: string; copy: string; bg: strin
 export const isImageUrl = (s: string) => /^(https?:\/\/|data:image\/(?:png|jpeg|webp);base64,)/i.test(s);
 export const emptySlot = (): StudioSlot => ({ url: "", prompt: "", source: "", signature: "" });
 export function newImageDraft(settings?: Partial<ImageSettings>, images: SavedImage[] = []): ImageStudioDraft {
-  const base: ImageSettings = { type: "photo", mood: IMAGE_MOODS[0], requirements: "", referencePrompt: "첨부 이미지의 색감과 분위기를 참고하되, 현재 글에 맞게 새로 구성해 주세요.", count: 2, method: "chatgpt" };
+  const base: ImageSettings = { type: "photo", mood: IMAGE_MOODS[0], requirements: "", referencePrompt: "첨부 이미지의 색감과 분위기를 참고하되, 현재 글에 맞게 새로 구성해 주세요.", count: 1, method: "chatgpt" };
   const next = { ...base, ...settings };
   if (!IMAGE_TYPES.some(t => t.id === next.type)) next.type = base.type;
   if (next.method !== "server") next.method = "chatgpt";
-  next.count = Math.min(4, Math.max(1, Number(next.count) || 2));
+  next.count = Math.min(2, Math.max(1, Number(next.count) || 1));
   const slots = Array.from({ length: 4 }, emptySlot);
   images.forEach((image, i) => {
     const index = Number.isInteger(image.slot) ? image.slot! : i;
@@ -33,6 +33,7 @@ export function newImageDraft(settings?: Partial<ImageSettings>, images: SavedIm
     slots[index] = { url: image.copy, prompt: image.prompt || "", source: image.source || "saved", signature: image.signature || "" };
     next.count = Math.max(next.count, index + 1);
   });
+  next.count = Math.min(2, next.count);
   return { settings: next, slots, reference: null };
 }
 export function draftSignature(title: string, body: string, draft: ImageStudioDraft): string {
