@@ -68,11 +68,12 @@ export default function TrendsPage() {
   const [cData, setCData] = useState<Record<string, { loading: boolean; insights?: CommentInsight[]; keywords?: { w: string; n: number }[]; demo?: boolean; disabled?: boolean }>>({});
   const [toast, setToast] = useState("");
   const say = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1700); };
-  const [gold, setGold] = useState<{ krwPerGram: number; usdPerOz: number; changePct: number | null } | null>(null);
+  const [gold, setGold] = useState<{ sell: number; date: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/gold-price").then((r) => r.json()).then((j) => {
-      if (j.krwPerGram) setGold(j);
+      const row = (j.rows ?? []).find((r: { id: string }) => r.id === "24k");
+      if (row && typeof row.sell === "number") setGold({ sell: row.sell, date: String(j.priceDate ?? j.date ?? "").slice(0, 10) });
     }).catch(() => {});
   }, []);
 
@@ -177,25 +178,19 @@ export default function TrendsPage() {
             {demo && <span className="text-[11.5px] font-bold text-neutral-500 bg-neutral-100 border border-neutral-200 rounded-full px-3 py-1.5">현재 데모 데이터 사용 중 · API Key 연결 시 실측 전환</span>}
           </div>
 
-          {/* 오늘 금 시세 (국제시세 기준) */}
+          {/* 오늘 금 시세 (국내 기준) */}
           <section className="card p-5 flex flex-wrap items-center gap-x-5 gap-y-2">
             <div>
-              <div className="label">오늘 금 시세 · 국제시세 기준</div>
+              <div className="label">오늘 금 시세 · 순금 1돈 팔때 기준{gold?.date ? ` (${gold.date})` : ""}</div>
               {gold ? (
                 <div className="mt-1 flex items-baseline gap-2 flex-wrap">
-                  <span className="text-[22px] font-black tracking-tight">1g {gold.krwPerGram.toLocaleString()}원</span>
-                  {gold.changePct !== null && (
-                    <span className={`text-[13px] font-extrabold ${gold.changePct >= 0 ? "text-red-500" : "text-blue-500"}`}>
-                      {gold.changePct >= 0 ? "▲" : "▼"} {Math.abs(gold.changePct)}%
-                    </span>
-                  )}
-                  <span className="text-[12px] text-neutral-400 font-semibold">${gold.usdPerOz.toLocaleString()}/oz</span>
+                  <span className="text-[22px] font-black tracking-tight">{gold.sell.toLocaleString()}원</span>
                 </div>
               ) : (
                 <div className="mt-1 text-[14px] font-bold text-neutral-400">시세 불러오는 중…</div>
               )}
             </div>
-            <Link href={{ pathname: "/create", query: { topic: "오늘 금 시세 안내" } }} className="btn-primary px-5 py-2.5 text-[13px] font-bold ml-auto">이 시세로 글 만들기 ✦</Link>
+            <Link href={{ pathname: "/create", query: { topic: gold ? `오늘 순금 1돈 ${gold.sell.toLocaleString()}원 기준 매도 타이밍 안내` : "오늘 금 시세 안내" } }} className="btn-primary px-5 py-2.5 text-[13px] font-bold ml-auto">이 시세로 글 만들기 ✦</Link>
           </section>
 
           {/* 검색 조건 */}
