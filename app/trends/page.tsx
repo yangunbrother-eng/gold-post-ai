@@ -269,16 +269,28 @@ export default function TrendsPage() {
             <section className="card p-5 animate-pop">
               <h3 className="font-extrabold text-[15px]">당근용 새 제목 10선 <span className="text-[11.5px] font-semibold text-neutral-400">원본 복사 아님 · 패턴 재가공 · 유사도 60%↑ 자동 재생성됨</span></h3>
               <div className="mt-3 divide-y divide-neutral-100">
-                {top10.map((t, i) => (
-                  <div key={t.title} className="py-2.5 flex items-center gap-3">
+                {top10.map((t, i) => {
+                  const source = scored.find(video => video.videoId === t.sourceVideoId);
+                  return (
+                  <div key={t.title} className="trend-title-result">
+                    {source && <Thumb v={source} />}
                     <span className="w-7 h-7 rounded-lg bg-neutral-900 text-white text-[12px] font-black flex items-center justify-center shrink-0">{i + 1}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-[13.5px] font-bold truncate">{t.pattern.startsWith("댓글 ·") && <span className="mr-1 text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 align-middle">💬 댓글 질문</span>}“{t.title}”</div>
+                      <div className="text-[13.5px] font-bold">{t.pattern.startsWith("댓글 ·") && <span className="mr-1 text-[10px] bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 align-middle">💬 댓글 질문</span>}“{t.title}”</div>
+                      {source && <div className="trend-title-source">
+                        <span>{source.channel}</span>
+                        <strong>조회수 {source.views.toLocaleString("ko-KR")}회</strong>
+                        <span>좋아요 {fmtNum(source.likes)} · 댓글 {source.comments.toLocaleString("ko-KR")}개</span>
+                        <button type="button" className="btn-ghost" onClick={() => {
+                          if (cOpen !== source.videoId) void loadComments(source);
+                          document.getElementById(`video-${source.videoId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}>💬 댓글 보기</button>
+                      </div>}
                       <div className="text-[11.5px] text-neutral-400">패턴 {t.pattern} · 추천도 <b className="text-neutral-700">{t.scores.recommend}</b> (관심 {t.scores.interest} · 최신 {t.scores.recency} · 중복 {t.scores.overlap})</div>
                     </div>
                     <Link href={`/create?topic=${encodeURIComponent(t.title)}`} className="btn-primary text-[12px] px-3.5 py-2 font-bold shrink-0">소식 만들기 →</Link>
                   </div>
-                ))}
+                ); })}
               </div>
               <p className="mt-2 text-[11.5px] text-neutral-400">※ 점수는 절대적 성과 예측이 아니라 <b>콘텐츠 아이디어 선별용 내부 지표</b>입니다.</p>
             </section>
@@ -296,7 +308,7 @@ export default function TrendsPage() {
               const made = madeTitle[m.videoId];
               const open = analyzedId === m.videoId;
               return (
-                <article key={m.videoId} className="card trend-video-card">
+                <article id={`video-${m.videoId}`} key={m.videoId} className="card trend-video-card" style={{scrollMarginTop:160}}>
                   <div className="trend-video-row">
                     <Thumb v={m} />
                     <div className="trend-video-copy">
@@ -309,7 +321,7 @@ export default function TrendsPage() {
                       </div>
                       <div className="mt-2.5 flex flex-wrap gap-1.5">
                         <button onClick={() => setAnalyzedId(open ? null : m.videoId)} className="btn-ghost flex-1 sm:flex-none px-3 py-1.5 text-[12px] font-bold">{open ? "분석 닫기" : "이 제목 분석"}</button>
-                        <button onClick={() => loadComments(m)} className="btn-ghost flex-1 sm:flex-none px-3 py-1.5 text-[12px] font-bold">{cOpen === m.videoId ? "댓글 닫기" : "💬 댓글 분석"}</button>
+                        <button onClick={() => loadComments(m)} className="btn-ghost flex-1 sm:flex-none px-3 py-1.5 text-[12px] font-bold">{cOpen === m.videoId ? "댓글 닫기" : "💬 댓글 보기"}</button>
                         <button onClick={() => { const r = carrotTitleFrom(m); setMadeTitle({ ...madeTitle, [m.videoId]: { title: r.title, similarity: r.similarity } }); say("당근용 새 제목 생성됨 (원본과 다름)"); }} className="btn-ghost flex-1 sm:flex-none px-3 py-1.5 text-[12px] font-bold">당근 제목 만들기</button>
                         <Link href={`/create?topic=${encodeURIComponent((madeTitle[m.videoId]?.title ?? carrotTitleFrom(m).title))}`} className="w-full sm:w-auto text-center text-[12px] font-bold rounded-xl px-3.5 py-1.5 text-white" style={{ background: "var(--brand)" }}>이 주제로 소식 만들기 →</Link>
                       </div>

@@ -126,3 +126,9 @@ main .trend-video-card { padding:14px; margin-bottom:14px; }
 .daangn-page-gap { display:flex; align-items:center; justify-content:center; min-width:18px; color:#8b8177; }
 .daangn-pagination { gap:5px; }
 .daangn-pagination button { padding:8px 10px; }
+
+.trend-title-result { display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; padding:16px 0; }
+.trend-title-result > .flex-1 { flex:1 1 220px; }
+.trend-title-source { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; font-size:12px; margin:8px 0; color:#62584e; }
+.trend-title-source strong { color:#ba3e0a; }
+.trend-title-source button { padding:6px 10px; }
