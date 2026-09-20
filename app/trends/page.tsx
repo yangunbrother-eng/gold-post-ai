@@ -6,7 +6,7 @@ import Topbar from "@/components/Topbar";
 import { useBrand, useContents } from "@/lib/store";
 import {
   TrendVideo, VideoMetrics, analyzeTitle, analyzeComments, buildCarrotTitles, carrotTitleFrom,
-  fmtNum, loadKeywords, recommendScore, saveKeywords, scoreVideo, CarrotTitle, CommentInsight
+  fmtNum, loadKeywords, recommendScore, saveKeywords, scoreVideo, CarrotTitle, CommentInsight, YTComment
 } from "@/lib/trends";
 
 type SortMode = "views" | "recent" | "engaged" | "rising";
@@ -71,14 +71,15 @@ export default function TrendsPage() {
   const [top10, setTop10] = useState<CarrotTitle[] | null>(null);
   const [mixingComments, setMixingComments] = useState(false);
   const [cOpen, setCOpen] = useState<string | null>(null);
-  const [cData, setCData] = useState<Record<string, { loading: boolean; insights?: CommentInsight[]; keywords?: { w: string; n: number }[]; demo?: boolean; disabled?: boolean }>>({});
+  const [cData, setCData] = useState<Record<string, { loading: boolean; insights?: CommentInsight[]; keywords?: { w: string; n: number }[]; comments?: YTComment[]; demo?: boolean; disabled?: boolean }>>({});
   const [toast, setToast] = useState("");
   const say = (m: string) => { setToast(m); setTimeout(() => setToast(""), 1700); };
-  const [gold, setGold] = useState<{ krwPerGram: number; usdPerOz: number; changePct: number | null } | null>(null);
+  const [gold, setGold] = useState<{ sell: number; date: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/gold-price").then((r) => r.json()).then((j) => {
-      if (j.krwPerGram) setGold(j);
+      const row = (j.rows ?? []).find((r: { id: string }) => r.id === "24k");
+      if (row && typeof row.sell === "number") setGold({ sell: row.sell, date: String(j.priceDate ?? j.date ?? "").slice(0, 10) });
     }).catch(() => {});
   }, []);
 
@@ -92,10 +93,12 @@ export default function TrendsPage() {
       const r = await fetch(`/api/youtube/comments?videoId=${m.videoId}`);
       const j = await r.json();
       if (j.disabled) { setCData((p) => ({ ...p, [m.videoId]: { loading: false, disabled: true } })); return; }
-      const a = analyzeComments(j.comments ?? []);
-      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: a.insights, keywords: a.keywords, demo: j.demo } }));
+      const list = (j.comments ?? []) as YTComment[];
+      const a = analyzeComments(list);
+      const top = [...list].sort((x, y) => y.likes - x.likes).slice(0, 10);
+      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: a.insights, keywords: a.keywords, comments: top, demo: j.demo } }));
     } catch {
-      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: [], keywords: [] } }));
+      setCData((p) => ({ ...p, [m.videoId]: { loading: false, insights: [], keywords: [], comments: [] } }));
     }
   };
 
@@ -200,25 +203,19 @@ export default function TrendsPage() {
 
           {showingSaved && !demo && <p role="status" className="text-[13px] text-neutral-600">새 검색 결과를 가져오지 못해 마지막으로 불러온 영상을 표시합니다. 썸네일과 영상 링크는 계속 이용할 수 있습니다.</p>}
 
-          {/* 오늘 금 시세 (국제시세 기준) */}
+          {/* 오늘 금 시세 (국내 기준) */}
           <section className="card p-5 flex flex-wrap items-center gap-x-5 gap-y-2">
             <div>
-              <div className="label">오늘 금 시세 · 국제시세 기준</div>
+              <div className="label">오늘 금 시세 · 순금 1돈 팔때 기준{gold?.date ? ` (${gold.date})` : ""}</div>
               {gold ? (
                 <div className="mt-1 flex items-baseline gap-2 flex-wrap">
-                  <span className="text-[22px] font-black tracking-tight">1g {gold.krwPerGram.toLocaleString()}원</span>
-                  {gold.changePct !== null && (
-                    <span className={`text-[13px] font-extrabold ${gold.changePct >= 0 ? "text-red-500" : "text-blue-500"}`}>
-                      {gold.changePct >= 0 ? "▲" : "▼"} {Math.abs(gold.changePct)}%
-                    </span>
-                  )}
-                  <span className="text-[12px] text-neutral-400 font-semibold">${gold.usdPerOz.toLocaleString()}/oz</span>
+                  <span className="text-[22px] font-black tracking-tight">{gold.sell.toLocaleString()}원</span>
                 </div>
               ) : (
                 <div className="mt-1 text-[14px] font-bold text-neutral-400">시세 불러오는 중…</div>
               )}
             </div>
-            <Link href={{ pathname: "/create", query: { topic: "오늘 금 시세 안내" } }} className="btn-primary px-5 py-2.5 text-[13px] font-bold ml-auto">이 시세로 글 만들기 ✦</Link>
+            <Link href={{ pathname: "/create", query: { topic: gold ? `오늘 순금 1돈 ${gold.sell.toLocaleString()}원 기준 매도 타이밍 안내` : "오늘 금 시세 안내" } }} className="btn-primary px-5 py-2.5 text-[13px] font-bold ml-auto">이 시세로 글 만들기 ✦</Link>
           </section>
 
           {/* 검색 조건 */}
@@ -355,8 +352,21 @@ export default function TrendsPage() {
                                   <Link href={`/create?topic=${encodeURIComponent(ins.title)}`} className="text-[11.5px] font-bold rounded-lg px-3 py-1.5 text-white shrink-0" style={{ background: "var(--brand)" }}>소식 만들기 →</Link>
                                 </div>
                               ))}
-                              {(cd.insights ?? []).length === 0 && <div className="text-[12.5px] text-neutral-400">질문형 댓글이 없습니다.</div>}
+                              {(cd.insights ?? []).length === 0 && (cd.comments ?? []).length === 0 && <div className="text-[12.5px] text-neutral-400">질문형 댓글이 없습니다.</div>}
                             </div>
+                            {(cd.comments ?? []).length > 0 && (
+                              <div className="mt-3">
+                                <div className="text-[12px] font-black text-neutral-600">👍 좋아요 순 댓글 최대 10개</div>
+                                <div className="mt-1.5 space-y-1.5">
+                                  {(cd.comments ?? []).map((c, i) => (
+                                    <div key={`${c.author}${i}`} className="rounded-xl bg-white border border-neutral-200 px-3.5 py-2.5">
+                                      <div className="text-[11.5px] font-bold text-neutral-500">{i + 1}. {c.author} <span className="font-semibold">· 👍 {c.likes}</span></div>
+                                      <div className="text-[13px] text-neutral-700 mt-0.5 leading-relaxed">{c.text.length > 120 ? c.text.slice(0, 120) + "…" : c.text}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </>
                         )}
                       </div>

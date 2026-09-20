@@ -33,6 +33,7 @@ export function newImageDraft(settings?: Partial<ImageSettings>, images: SavedIm
     slots[index] = { url: image.copy, prompt: image.prompt || "", source: image.source || "saved", signature: image.signature || "" };
     next.count = Math.max(next.count, index + 1);
   });
+  next.count = Math.min(2, next.count);
   return { settings: next, slots, reference: null };
 }
 export function draftSignature(title: string, body: string, draft: ImageStudioDraft): string {
