@@ -11,7 +11,7 @@ import ImageStudio from "@/components/ImageStudio";
 import { newImageDraft, SLOT_NAMES, type ImageSettings, type ImageStudioDraft } from "@/lib/image-studio";
 import { useBrand, useContents, uid, todayStr } from "@/lib/store";
 import { checkSimilarity, detectType, generatePost, rewritePost, suggestTitles } from "@/lib/ai";
-import { type HostAi, buildHostPrompt, openHostAi, splitPasted } from "@/lib/ai-host";
+import { type HostAi, buildHostPrompt, openHostAi, splitPasted, isWritingPrompt } from "@/lib/ai-host";
 import { launchMobileGemini, MOBILE_GEMINI_URL } from "@/lib/mobile-gemini";
 import { EDIT_ACTIONS, QUICK_TOPICS } from "@/lib/sample-data";
 import type { ContentItem, ContentStatus, ContentType, GeneratedPost } from "@/lib/types";
@@ -30,8 +30,10 @@ const SOURCES = [
   { id: "direct", label: "직접 주제 입력" },
   { id: "naver", label: "네이버에서 찾기" },
   { id: "youtube", label: "유튜브에서 찾기" },
-  { id: "image", label: "이미지 예시 참고" },
 ] as const;
+type SourceTab = (typeof SOURCES)[number]["id"];
+const COMPOSER_PREFS_KEY = "cpai_composer_preferences_v1";
+const DAANGN_COMPOSE_URL = "https://bizprofile.daangn.com/biz_accounts/1132417/manager/posts/new/?entry=business_profile.post.manage";
 const POST_TYPES: { id: string; type: ContentType }[] = [
   { id: "정보형", type: "정보성" },
   { id: "후기형", type: "후기형" },
@@ -39,13 +41,7 @@ const POST_TYPES: { id: string; type: ContentType }[] = [
   { id: "상담 유도형", type: "문의 유도형" },
   { id: "이벤트/안내형", type: "이벤트" },
 ];
-const NAVER_EXAMPLES = ["금니 매입", "돌반지 가격", "오늘 금값", "끊어진 목걸이", "18K 14K 차이", "금 팔때", "보증서 없는 금", "한쪽 귀걸이", "치과 금니", "금테크"];
-const IMAGE_EXAMPLES = [
-  { copy: "오늘 금값 확인하세요", bg: "#111111", prompt: "오늘 금값 기준으로 지금 팔아도 되는지 알려주는 글" },
-  { copy: "이 작은 조각도 될까요?", bg: "#FF6F0F", prompt: "작은 금 조각도 매입되는지 궁금해하는 고객용 글" },
-  { copy: "오늘 정상 영업합니다", bg: "#14324F", prompt: "오늘 정상 영업한다는 안내 글" },
-  { copy: "돌반지 얼마일까?", bg: "#5B3DF5", prompt: "오래된 돌반지 가격 문의 고객용 글" },
-];
+const NAVER_EXAMPLES = ["금니 매입", "돌반지 가격", "오늘 금값", "순금 매입", "18K 14K 차이", "금 팔때", "보증서 없는 금", "한쪽 귀걸이", "치과 금니", "금테크"];
 type StudioContent = ContentItem & { imageStudio?: ImageSettings };
 const readTags = (text: string) => Array.from(new Set(text.match(/#[^\s#]+/g) || []));
 const stamp = (title: string, body: string, tags: string[], draft: ImageStudioDraft) => JSON.stringify({ title, body, tags, settings: draft.settings, slots: draft.slots });
@@ -68,6 +64,7 @@ function CreateInner() {
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [error, setError] = useState("");
+  const [generateWarning, setGenerateWarning] = useState("");
   const [hostPrompt, setHostPrompt] = useState("");
   const [pasted, setPasted] = useState("");
   const [showPaste, setShowPaste] = useState(false);
@@ -81,15 +78,20 @@ function CreateInner() {
   const [payloadBusy, setPayloadBusy] = useState(false);
   const [toneSel, setToneSel] = useState("");
   const [lenSel, setLenSel] = useState("보통");
-  const [sourceTab, setSourceTab] = useState<"direct" | "naver" | "youtube" | "image">("direct");
+  const [sourceTab, setSourceTab] = useState<SourceTab>("direct");
   const [postType, setPostType] = useState<ContentType | "">("");
   const [ytText, setYtText] = useState("");
+  const [ytKws, setYtKws] = useState("");
+  const [ytResults, setYtResults] = useState<{ videoId: string; title: string; channel: string; publishedAt: string; views: number; url: string; keyword: string }[]>([]);
+  const [ytChecked, setYtChecked] = useState<number[]>([]);
+  const [ytLoading, setYtLoading] = useState(false);
   const [naverKws, setNaverKws] = useState("");
   const [naverResults, setNaverResults] = useState<{ title: string; link: string; blogger: string; description: string; postdate: string; kw: string }[]>([]);
   const [naverChecked, setNaverChecked] = useState<number[]>([]);
   const [naverLoading, setNaverLoading] = useState(false);
   const [naverErr, setNaverErr] = useState("");
   const [refCount, setRefCount] = useState("5개");
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [extra, setExtra] = useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const effectiveTone = toneSel || tone;
@@ -101,6 +103,7 @@ function CreateInner() {
   const [planDate, setPlanDate] = useState(todayStr());
   const opened = useRef("");
   const lastAuto = useRef("");
+  const pendingWritingRequest = useRef("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const request = useRef<AbortController | null>(null);
   const main = useRef<HTMLElement>(null);
@@ -116,6 +119,24 @@ function CreateInner() {
   const exportText = () => `${title}\n\n${body}${tags.some(t => !body.includes(t)) ? `\n\n${tags.filter(t => !body.includes(t)).join(" ")}` : ""}`;
 
   useEffect(() => () => { request.current?.abort(); if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
+  useEffect(() => { if (input.trim()) setGenerateWarning(""); }, [input]);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COMPOSER_PREFS_KEY) || "{}") as Record<string, unknown>;
+      if (typeof saved.sourceTab === "string" && SOURCES.some(option => option.id === saved.sourceTab)) setSourceTab(saved.sourceTab as SourceTab);
+      if (typeof saved.quick === "string" && QUICK_TOPICS.includes(saved.quick)) setQuick(saved.quick);
+      if (typeof saved.provider === "string" && PROVIDERS.some(option => option.id === saved.provider)) setProvider(saved.provider as WritingProvider);
+      if (typeof saved.postType === "string" && POST_TYPES.some(option => option.type === saved.postType)) setPostType(saved.postType as ContentType);
+      if (typeof saved.toneSel === "string" && TONES.includes(saved.toneSel)) setToneSel(saved.toneSel);
+      if (typeof saved.lenSel === "string" && LENGTHS.includes(saved.lenSel)) setLenSel(saved.lenSel);
+      if (typeof saved.refCount === "string" && ["3개", "5개", "8개"].includes(saved.refCount)) setRefCount(saved.refCount);
+    } catch { /* Ignore old or damaged browser preferences. */ }
+    setPrefsLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!prefsLoaded) return;
+    localStorage.setItem(COMPOSER_PREFS_KEY, JSON.stringify({ sourceTab, quick, provider, postType, toneSel, lenSel, refCount }));
+  }, [prefsLoaded, sourceTab, quick, provider, postType, toneSel, lenSel, refCount]);
   useEffect(() => {
     if (!dirty && !imageBusy) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
@@ -137,7 +158,7 @@ function CreateInner() {
     const fill = async () => {
       try {
         const text = await navigator.clipboard.readText();
-        if (cancelled || !text || text.trim().length < 20 || text === lastAuto.current) return;
+        if (cancelled || !text || text.trim().length < 20 || text === lastAuto.current || isWritingPrompt(text)) return;
         let replaced = false;
         setPasted(prev => {
           if (prev && prev.trim()) return prev;
@@ -198,7 +219,12 @@ function CreateInner() {
   const basePost = (): GeneratedPost => ({ title, body, hook: post?.hook ?? body.split("\n")[0] ?? "", coreMessage: post?.coreMessage ?? "", cta: post?.cta ?? brand.defaultCta, imageCopy: post?.imageCopy ?? title.slice(0, 14), imageSubCopy: post?.imageSubCopy ?? brand.businessName, hashtags: tags, type: post?.type ?? detected });
   const generate = async () => {
     if (busy || imageBusy || mobileStarting.current) return;
-    if (!input.trim()) { setError("어떤 소식을 쓸지 먼저 한 줄로 적어 주세요."); return; }
+    if (!input.trim()) {
+      setError("");
+      setGenerateWarning("먼저 ‘오늘의 주제’를 입력하거나 빠른 주제를 하나 선택해 주세요.");
+      return;
+    }
+    setGenerateWarning("");
     const effectiveInput = extra.trim() ? `${input}\n\n[추가 요청] ${extra.trim()}` : input;
     log(`초안 작성 시작 (방식: ${provider}, 말투: ${effectiveTone}, 분량: ${lenSel})`);
     if (provider === "gemini-mobile") {
@@ -226,7 +252,9 @@ function CreateInner() {
       const name = provider === "gemini" ? "Gemini" : "ChatGPT";
       setHostPrompt(prompt); setShowPaste(true); setError("");
       const clipboard = navigator.clipboard?.writeText(prompt).then(() => true).catch(() => false) ?? Promise.resolve(false);
-      openHostAi(provider, prompt);
+      const requestId = typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      pendingWritingRequest.current = requestId;
+      openHostAi(provider, prompt, { requestId });
       const copied = await clipboard;
       say(`${name} 열기를 요청했어요. 자동 전송이 안 되면 ${copied ? "복사된 지시문을 붙여넣어" : "지시문을 다시 복사해"} 전송해 주세요.`); log(`${name} 지시문 전달, 결과 붙여넣기 대기 중`); return;
     }
@@ -241,12 +269,36 @@ function CreateInner() {
     finally { setBusy(false); }
   };
   const applyPasted = (value = pasted) => {
+    if (isWritingPrompt(value)) { setError("작성 지시문이 복사돼 있어요. ChatGPT·Gemini의 완성된 답변을 복사해 주세요."); return; }
     const parsed = splitPasted(value);
     if (!parsed.title || !parsed.body) { setError("제목과 본문이 함께 있는 결과를 붙여넣어 주세요."); return; }
     applyPost({ title: parsed.title, body: parsed.body, hook: parsed.body.split("\n")[0] ?? "", coreMessage: "", cta: brand.defaultCta, imageCopy: parsed.title.slice(0, 14), imageSubCopy: brand.businessName, hashtags: readTags(parsed.body), type: detected });
     setShowPaste(false); log("외부 작성 결과 적용됨"); say("가져온 글을 적용했어요.");
   };
-  const paste = async () => { try { const text = await navigator.clipboard.readText(); setPasted(text); applyPasted(text); } catch { setError("클립보드를 읽을 수 없어요. 아래 입력칸에 직접 붙여넣어 주세요."); } };
+  const paste = async () => { try { const text = await navigator.clipboard.readText(); if (isWritingPrompt(text)) { setPasted(""); setError("작성 지시문이 복사돼 있어요. ChatGPT·Gemini의 완성된 답변을 복사한 뒤 다시 눌러 주세요."); return; } setPasted(text); applyPasted(text); } catch { setError("클립보드를 읽을 수 없어요. 아래 입력칸에 직접 붙여넣어 주세요."); } };
+  useEffect(() => {
+    const receive = () => {
+      const bridge = document.getElementById("cpai-text-bridge");
+      const raw = bridge?.getAttribute("data-payload");
+      if (!raw) return;
+      try {
+        const payload = JSON.parse(raw) as { requestId?: string; text?: string };
+        if (!payload.requestId || payload.requestId !== pendingWritingRequest.current || !payload.text || isWritingPrompt(payload.text)) return;
+        const parsed = splitPasted(payload.text);
+        if (!parsed.title || !parsed.body) return;
+        setPasted(payload.text);
+        applyPost({ title: parsed.title, body: parsed.body, hook: parsed.body.split("\n")[0] ?? "", coreMessage: "", cta: brand.defaultCta, imageCopy: parsed.title.slice(0, 14), imageSubCopy: brand.businessName, hashtags: readTags(parsed.body), type: detected });
+        setShowPaste(false);
+        pendingWritingRequest.current = "";
+        bridge?.setAttribute("data-consumed-id", payload.requestId);
+        window.dispatchEvent(new Event("cpai:generated-text-consumed"));
+        log("확장프로그램에서 작성 결과 자동 적용");
+        say("GPT에서 만든 글을 제목과 본문에 자동으로 넣었어요.");
+      } catch { /* 확장프로그램 데이터가 완성될 때까지 기다린다. */ }
+    };
+    window.addEventListener("cpai:generated-text", receive);
+    return () => window.removeEventListener("cpai:generated-text", receive);
+  }, [brand.businessName, brand.defaultCta, detected]);
   const searchNaver = async () => {
     const kws = naverKws.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3);
     if (!kws.length) { setError("네이버 검색 키워드를 쉼표로 구분해 입력해 주세요. (예: 금니 매입, 돌반지 가격)"); return; }
@@ -280,6 +332,32 @@ function CreateInner() {
     // Keep the chosen writing method; the removed site-AI option must not be selected here.
     log(`네이버 참고글 ${picked.length}개로 주제 만들기`);
     say("참고 자료를 넣었어요. 아래 생성 버튼을 눌러주세요.");
+  };
+  const searchYoutube = async () => {
+    const kws = ytKws.split(",").map(value => value.trim()).filter(Boolean).slice(0, 3);
+    if (!kws.length) { setError("유튜브 검색 키워드를 입력해 주세요. (예: 돌반지 가격)"); return; }
+    const count = parseInt(refCount) || 5;
+    setYtLoading(true); setYtResults([]); setYtChecked([]); setError("");
+    log(`유튜브 자동 검색 시작 (${kws.join(", ")})`);
+    try {
+      const response = await fetch(`/api/youtube/search?keywords=${encodeURIComponent(kws.join(","))}&days=30&sort=views`);
+      const result = await response.json();
+      if (!response.ok || !Array.isArray(result.videos)) throw new Error("failed");
+      const videos = result.videos.slice(0, count);
+      setYtResults(videos); setYtChecked(videos.map((_: unknown, index: number) => index));
+      log(`유튜브 검색 완료 (${videos.length}건)`);
+      if (!videos.length) setError("유튜브 검색 결과가 없어요. 키워드를 바꿔 보세요.");
+    } catch { setError("유튜브 검색에 실패했어요. 잠시 후 다시 시도해 주세요."); log("유튜브 검색 실패"); }
+    finally { setYtLoading(false); }
+  };
+  const applyYoutube = () => {
+    const picked = ytChecked.map(index => ytResults[index]).filter(Boolean);
+    if (!picked.length) { setError("참고할 영상을 1개 이상 고르세요."); return; }
+    const topic = ytKws.split(",")[0]?.trim() || picked[0].keyword || picked[0].title;
+    const references = picked.map(video => `■ ${video.title} (${video.channel})\n조회수 ${video.views.toLocaleString()}회\n영상: ${video.url}`).join("\n\n");
+    setInput(`${topic}\n\n[참고 자료]\n${references}`);
+    log(`유튜브 영상 ${picked.length}개로 주제 만들기`);
+    say("유튜브 참고 자료를 넣었어요. 아래 생성 버튼을 눌러주세요.");
   };
   const edit = (id: string) => {
     if (id === "regen") { go("sec-topic", 1); say("주제와 작성 방식을 확인한 뒤 새로 작성해 주세요."); return; }
@@ -315,9 +393,41 @@ function CreateInner() {
         } catch { /* Extensions can fetch the original URL when CORS blocks conversion. */ }
         return { slot: i + 1, url, dataUrl };
       }));
-      setPayload(JSON.stringify({ source: "carrot-post-ai", version: "ext/1.2", action: "autofill-news", title, body: exportText().slice(title.length).trim(), images: prepared, business: brand.businessName }, null, 2));
+      const publishPayload = JSON.stringify({ source: "carrot-post-ai", version: "ext/1.5", action: "autofill-news", title, body: exportText().slice(title.length).trim(), images: prepared, business: brand.businessName }, null, 2);
+      setPayload(publishPayload);
+      let bridge = document.getElementById("cpai-publish-bridge");
+      if (!bridge) { bridge = document.createElement("div"); bridge.id = "cpai-publish-bridge"; bridge.hidden = true; document.documentElement.appendChild(bridge); }
+      bridge.setAttribute("data-payload", publishPayload);
+      window.dispatchEvent(new Event("cpai:publish-payload"));
       log(`전송 데이터 준비 완료 (이미지 ${prepared.length}장)`);
     } finally { setPayloadBusy(false); }
+  };
+  const sendToDaangn = () => {
+    if (!payload) { say("전송할 글과 이미지가 아직 준비되지 않았어요."); return; }
+    let bridge = document.getElementById("cpai-publish-bridge");
+    if (!bridge) { bridge = document.createElement("div"); bridge.id = "cpai-publish-bridge"; bridge.hidden = true; document.documentElement.appendChild(bridge); }
+    bridge.setAttribute("data-payload", payload);
+    bridge.removeAttribute("data-send-ok");
+    let answered = false;
+    const receive = () => {
+      answered = true;
+      const ok = bridge?.getAttribute("data-send-ok") === "true";
+      say(ok ? "당근 소식 작성 화면으로 글과 이미지를 보냈어요." : "확장프로그램 연결을 확인한 뒤 다시 눌러주세요.");
+    };
+    window.addEventListener("cpai:send-to-daangn-result", receive, { once: true });
+    window.dispatchEvent(new Event("cpai:send-to-daangn"));
+    log("당근 소식 작성 화면으로 자동입력 요청");
+    say("당근 소식 작성 화면으로 보내고 있어요.");
+    setTimeout(() => {
+      if (answered) return;
+      window.removeEventListener("cpai:send-to-daangn-result", receive);
+      say("확장프로그램 연결이 끊어졌어요. 확장프로그램과 이 페이지를 새로고침한 뒤 다시 눌러주세요.");
+    }, 1800);
+  };
+  const openDaangnCompose = () => {
+    const composeTab = window.open(DAANGN_COMPOSE_URL, "cpai-daangn-compose");
+    composeTab?.focus();
+    log("금박사 소식 작성 탭 열기 또는 기존 탭 재사용");
   };
   const mobileMode = provider === "gemini-mobile";
   const hostName = provider === "gemini" || mobileMode ? "Gemini" : "ChatGPT";
@@ -352,15 +462,13 @@ function CreateInner() {
         </div>}
         {sourceTab === "youtube" && <div className="ws-form-group ws-stack">
           <span className="ws-label">유튜브에서 찾기</span>
-          <p className="ws-helper">키워드로 유튜브 검색을 열고, 영상 설명이나 댓글을 복사해 아래에 붙여넣으세요. 그대로 베끼지 않고 우리 말투로 다시 씁니다.</p>
-          <div className="ws-secondary-actions"><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 글 개수<select className="ws-input" value={refCount} onChange={e => setRefCount(e.target.value)} aria-label="참고 글 개수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(n => <option key={n} value={n}>{n}</option>)}</select></label></div>
-          <label className="ws-label" htmlFor="yt-paste">참고 글 붙여넣기 (최대 {refCount}까지 이어 붙이기)</label>
-          <textarea id="yt-paste" className="ws-input" rows={5} value={ytText} onChange={e => setYtText(e.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." />
-          <button type="button" className="ws-button ws-button-primary" disabled={!ytText.trim()} onClick={() => { const found = (ytText.match(/제목:/g) || []).length; log(found > 1 ? `유튜브 참고글 ${found}개 중 첫 번째 적용` : "유튜브 참고글 적용"); applyPasted(ytText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button>
+          <p className="ws-helper">검색어를 입력하면 인기 영상을 찾아요. 고른 영상 제목과 반응을 참고해 우리 매장 글로 다시 씁니다.</p>
+          <div className="ws-chips">{NAVER_EXAMPLES.slice(0, 8).map(keyword => <button key={keyword} type="button" className={`ws-chip ${ytKws.split(",").map(value => value.trim()).includes(keyword) ? "is-active" : ""}`} onClick={() => { const current = ytKws.split(",").map(value => value.trim()).filter(Boolean); setYtKws(current.includes(keyword) ? current.filter(value => value !== keyword).join(", ") : [...current, keyword].slice(0, 3).join(", ")); }}>{keyword}</button>)}</div>
+          <div className="ws-secondary-actions"><input className="ws-input" value={ytKws} onChange={event => setYtKws(event.target.value)} placeholder="검색 키워드 (예: 돌반지 가격, 금 팔때)" aria-label="유튜브 검색 키워드" /><label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 700 }}>참고 영상 수<select className="ws-input" value={refCount} onChange={event => setRefCount(event.target.value)} aria-label="참고 영상 수" style={{ width: 90 }}>{["3개", "5개", "8개"].map(value => <option key={value} value={value}>{value}</option>)}</select></label><button type="button" className="ws-button ws-button-primary" disabled={ytLoading} onClick={() => void searchYoutube()}>{ytLoading ? "검색 중…" : "자동으로 검색하기"}</button></div>
+          {ytResults.length > 0 && <div role="group" aria-label="유튜브 검색 결과 선택">{ytResults.map((video, index) => <label key={video.videoId} className="ws-checklist" style={{ display: "flex", gap: 8, marginBottom: 8 }}><input type="checkbox" checked={ytChecked.includes(index)} onChange={event => setYtChecked(previous => event.target.checked ? [...previous, index] : previous.filter(value => value !== index))} style={{ marginTop: 4 }} /><span><strong>{video.title}</strong><br /><span style={{ fontSize: 12, opacity: 0.7 }}>{video.channel} · 조회수 {video.views.toLocaleString()}회</span></span></label>)}<button type="button" className="ws-button ws-button-primary" onClick={applyYoutube}>선택한 {ytChecked.length}개로 주제 만들기<UiIcon name="arrow" size={16} /></button></div>}
+          <details className="ws-disclosure"><summary>영상 설명·댓글을 직접 붙여넣기</summary><label className="ws-label" htmlFor="yt-paste">참고 글 붙여넣기</label><textarea id="yt-paste" className="ws-input" rows={5} value={ytText} onChange={event => setYtText(event.target.value)} placeholder="제목과 본문을 함께 붙여넣으세요." /><button type="button" className="ws-button ws-button-primary" disabled={!ytText.trim()} onClick={() => { const found = (ytText.match(/제목:/g) || []).length; log(found > 1 ? `유튜브 참고글 ${found}개 중 첫 번째 적용` : "유튜브 참고글 적용"); applyPasted(ytText); }}>가져온 글 적용<UiIcon name="arrow" size={16} /></button></details>
           <Link href="/trends" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide ws-form-group" aria-describedby="youtube-topic-help"><Icon name="youtube" size={18} />인기 영상·댓글 분석으로 찾기<UiIcon name="external" size={16} /></Link><p id="youtube-topic-help" className="ws-helper">분석 화면은 새 탭에서 열립니다. 작성 중인 화면은 그대로 남아요.</p>
         </div>}
-        {sourceTab === "image" && <div className="ws-form-group" role="group" aria-label="이미지 예시 참고"><span className="ws-label">이미지 예시 참고</span><p className="ws-helper">맘에 드는 대표 문구를 고르면 그에 맞는 주제로 시작합니다.</p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>{IMAGE_EXAMPLES.map(ex => <button key={ex.copy} type="button" className="ws-button" style={{ padding: 0, overflow: "hidden" }} onClick={() => { setInput(ex.prompt); setQuick("자유 주제"); setSourceTab("direct"); log(`이미지 예시 선택: ${ex.copy}`); say("주제를 넣었어요. 아래에서 작성해 주세요."); }}><span style={{ display: "block", background: ex.bg, color: "#fff", fontWeight: 900, fontSize: 15, padding: "22px 10px" }}>{ex.copy}</span><span style={{ display: "block", fontSize: 11, padding: "8px", opacity: 0.65 }}>이 주제로 시작</span></button>)}</div></div>}
         <div className="ws-form-group" role="group" aria-label="글 유형"><span className="ws-label">글 유형</span><div className="ws-chips">{POST_TYPES.map(p => <button key={p.id} type="button" aria-pressed={postType === p.type} className={`ws-chip ${postType === p.type ? "is-active" : ""}`} onClick={() => setPostType(postType === p.type ? "" : p.type)}>{p.id}</button>)}</div>{!postType && <p className="ws-helper">고르지 않으면 주제에 맞게 자동으로 정해져요.</p>}</div>
         <div className="ws-form-group"><label className="ws-label" htmlFor="extra-req">추가 요청 사항</label><textarea id="extra-req" className="ws-input" rows={2} value={extra} onChange={e => setExtra(e.target.value)} placeholder="예) 끝문장은 전화번호로 끝나게, 이모지 빼고" /></div>
         <div className="ws-form-group"><span className="ws-label">어떻게 작성할까요?</span><div className="ws-provider-grid">{PROVIDERS.map(p => <button type="button" key={p.id} disabled={busy || imageBusy} aria-pressed={provider === p.id} className={`ws-provider ${provider === p.id ? "is-active" : ""}`} onClick={() => { setProvider(p.id); setShowPaste(false); setMobileIssue(false); }}><strong>{p.name}</strong><small>{p.desc}</small></button>)}</div></div>
@@ -369,9 +477,10 @@ function CreateInner() {
           <div style={{ flex: 1 }}><label htmlFor="len-sel" style={{ fontSize: 12, fontWeight: 700, display: "block", marginBottom: 4 }}>분량</label><select id="len-sel" className="ws-input" style={{ padding: "8px 10px", fontSize: 13 }} value={lenSel} onChange={e => setLenSel(e.target.value)}>{LENGTHS.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
         </div>
         <p className="ws-helper ws-form-group">{brand.businessName} · {tone} <Link href="/brand" className="ws-text-link">매장 정보 확인<UiIcon name="chevron" size={13} /></Link></p>
+        {generateWarning && <div className="ws-note ws-note-error ws-form-group" role="alert" style={{ border: "2px solid #d74b3f", fontSize: 15, fontWeight: 800, padding: 16 }}><UiIcon name="info" size={20} /><span>{generateWarning}</span></div>}
         <button type="button" className="ws-button ws-button-primary ws-button-wide" disabled={busy || imageBusy} onClick={() => void generate()}><UiIcon name="spark" />{busy ? "초안을 만들고 있어요…" : provider === "chatgpt" || provider === "gemini" ? `${hostName} 작성 지시문 만들기` : provider === "template" ? "빠른 초안 만들기" : "지시문 복사하고 모바일 제미나이 열기"}</button>
         <button type="button" className="ws-text-link ws-button-wide" onClick={() => go("sec-draft", 2)}>AI 없이 직접 작성할게요<UiIcon name="arrow" size={16} /></button>
-        {showPaste && (provider === "chatgpt" || provider === "gemini" || mobileMode) && <div className="ws-form-group ws-stack"><div className="ws-note"><UiIcon name="info" size={18} /><span>{mobileMode ? "지시문을 복사하고 Gemini를 열어요. Gemini 입력창에 붙여넣고 직접 전송한 뒤, 답변 전체를 복사해 아래에 적용해 주세요. 확장프로그램 없이 사용하는 방식이에요." : `${hostName}에서 작성이 끝나면 결과를 복사해 아래로 가져오세요. 자동 입력·전송은 연결된 확장프로그램이 담당해요.`}</span></div><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(hostPrompt)}><UiIcon name="copy" size={16} />지시문 다시 복사</button>{mobileMode && mobileIssue && <a href={MOBILE_GEMINI_URL} target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide">Gemini 직접 열기<UiIcon name="external" size={16} /></a>}<details className="ws-disclosure"><summary>복사가 안 되나요? 지시문 직접 보기</summary><textarea className="ws-input" value={hostPrompt} readOnly rows={6} aria-label="직접 복사할 작성 지시문" /></details><label className="ws-label" htmlFor="pasted-result">작성 결과 붙여넣기</label><textarea id="pasted-result" className="ws-input" rows={6} value={pasted} onChange={e => setPasted(e.target.value)} placeholder={"제목: …\n본문:\n…"} /><div className="ws-secondary-actions"><button className="ws-button" type="button" onClick={() => void paste()}>클립보드에서 가져오기</button><button className="ws-button ws-button-primary" type="button" onClick={() => applyPasted()}>입력한 글 적용<UiIcon name="arrow" size={16} /></button></div></div>}
+        {showPaste && (provider === "chatgpt" || provider === "gemini" || mobileMode) && <div className="ws-form-group ws-stack"><div className="ws-note"><UiIcon name="info" size={18} /><span>{mobileMode ? "지시문을 복사하고 Gemini를 열어요. Gemini 입력창에 붙여넣고 직접 전송한 뒤, 답변 전체를 복사해 아래에 적용해 주세요. 확장프로그램 없이 사용하는 방식이에요." : `${hostName}에서 작성이 끝나면 완성된 답변을 복사해 아래로 가져오세요. 작성 지시문은 결과로 적용되지 않아요.`}</span></div><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(hostPrompt)}><UiIcon name="copy" size={16} />지시문 다시 복사</button>{mobileMode && mobileIssue && <a href={MOBILE_GEMINI_URL} target="_blank" rel="noopener noreferrer" className="ws-button ws-button-wide">Gemini 직접 열기<UiIcon name="external" size={16} /></a>}<details className="ws-disclosure"><summary>복사가 안 되나요? 지시문 직접 보기</summary><textarea className="ws-input" value={hostPrompt} readOnly rows={6} aria-label="직접 복사할 작성 지시문" /></details><label className="ws-label" htmlFor="pasted-result">작성 결과 붙여넣기</label><textarea id="pasted-result" className="ws-input" rows={6} value={pasted} onChange={e => setPasted(e.target.value)} placeholder={"ChatGPT·Gemini의 완성된 답변만 붙여넣으세요.\n\n제목: …\n본문:\n…"} /><div className="ws-secondary-actions"><button className="ws-button" type="button" onClick={() => void paste()}>클립보드에서 가져오기</button><button className="ws-button ws-button-primary" type="button" onClick={() => applyPasted()}>입력한 글 적용<UiIcon name="arrow" size={16} /></button></div></div>}
       </section>
       <section id="sec-draft" className="ws-panel ws-compose"><h2>우리 매장답게 다듬어 주세요.</h2><p className="ws-helper">수정한 초안이 다음 단계 이미지에 반영돼요.</p><div className="ws-form-group"><div className="ws-form-heading"><label className="ws-label" htmlFor="post-title">소식 제목</label><span>{title.length}자</span></div><input id="post-title" className="ws-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="고객의 관심을 끄는 제목" /></div><div className="ws-form-group"><div className="ws-form-heading"><label className="ws-label" htmlFor="post-body">소식 본문</label><span>{body.length.toLocaleString()}자</span></div><textarea id="post-body" className="ws-input" rows={12} value={body} onChange={e => setBody(e.target.value)} placeholder="고객에게 전하고 싶은 이야기를 적어 주세요." /></div>
           <div className="ws-form-group"><label htmlFor="post-tags" className="ws-label">해시태그</label><input id="post-tags" className="ws-input" value={tags.join(" ")} onChange={e => setTags(e.target.value.split(" "))} onBlur={() => setTags(previous => Array.from(new Set(previous.filter(Boolean).map(t => t.startsWith("#") ? t : `#${t}`))))} placeholder="#금박사 #제주금매입" /></div>
@@ -383,7 +492,7 @@ function CreateInner() {
       <div id="sec-publish"><section className="ws-panel ws-compose"><h2>발행 전에 한 번 확인해 주세요.</h2><p className="ws-helper">실제 당근 화면과 다를 수 있는 미리보기예요.</p><div className="ws-preview ws-form-group"><PhonePreview title={title} body={exportText().slice(title.length).trim()} bizName={brand.businessName} time="미리보기" imageCopy="" imageSub="" bg={brand.color} logo={brand.logoUrl} logoText={brand.logoText} aiImages={images} /></div><div className="ws-checklist"><label><input type="checkbox" checked={checked} onChange={e => setChecked(e.target.checked)} /><span>시세·거래 사례·연락처를 확인했어요. 생성한 이미지를 실제 매장·고객 사진으로 오해하게 쓰지 않아요.</span></label></div><div className="ws-editor-actions"><button type="button" className="ws-button" onClick={() => go("sec-draft", 2)}>글 수정</button><button type="button" className="ws-button" onClick={() => go("sec-images", 3)}>이미지 수정</button><button type="button" className="ws-button" disabled={!checked} onClick={() => save("검수 완료")}>검수 완료로 저장</button></div><button type="button" className="ws-button ws-button-primary ws-button-wide ws-form-group" disabled={!checked || payloadBusy} onClick={() => void openSend()}>당근 발행 준비<UiIcon name="external" size={17} /></button><p className="ws-helper ws-form-group">실제 발행은 당근에서 내용을 확인하고 등록해야 완료돼요.</p></section><section className="ws-panel"><label htmlFor="plan-date" className="ws-label">나중에 올릴 예정인가요?</label><p className="ws-helper">자동 발행이 아니라 캘린더에 예정일을 기록해요.</p><div className="ws-secondary-actions ws-form-group"><input className="ws-input" id="plan-date" type="date" value={planDate} min={todayStr()} onChange={e => setPlanDate(e.target.value)} /><button type="button" className="ws-button" disabled={!checked || !planDate || planDate < todayStr()} onClick={() => save("발행 예정")}>발행 예정일 저장</button></div></section></div>
       <details className="ws-disclosure ws-form-group"><summary>실행 로그{logs.length ? ` (${logs.length})` : ""}</summary><div className="ws-note" style={{ whiteSpace: "pre-wrap", maxHeight: 180, overflow: "auto" }}>{logs.length ? logs.join("\n") : "아직 기록이 없어요. 글을 만들거나 저장하면 여기에 남습니다."}</div><button type="button" className="ws-button ws-button-wide" disabled={!logs.length} onClick={() => void copy(logs.join("\n"), "로그를 복사했어요.")}>로그 복사</button></details>
     </main>
-    <UiDialog open={sendOpen} title="당근 발행 준비" onClose={() => setSendOpen(false)}><div className="ws-note"><UiIcon name="info" size={18} />복사해도 글이 자동 발행되지는 않아요.</div><div><h3 className="ws-label">1. 글을 복사하세요</h3><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(exportText(), "제목·본문·해시태그를 복사했어요.")}>글 전체 복사</button></div><div><h3 className="ws-label">2. 이미지를 준비하세요</h3><div className="ws-secondary-actions">{images.map((url, i) => <a key={i} href={url} download={`post-image-${i + 1}.jpg`} className="ws-button">이미지 {i + 1} 저장</a>)}</div></div><div><h3 className="ws-label">3. 당근에서 붙여넣고 등록하세요</h3><a href="https://www.daangn.com/kr/business" target="_blank" rel="noopener noreferrer" className="ws-button ws-button-primary ws-button-wide">당근 비즈니스 열기<UiIcon name="external" size={17} /></a><p className="ws-helper ws-form-group">이미지를 첨부하고 등록 전 최종 확인해 주세요.</p></div><details className="ws-disclosure"><summary>고급 · PC 확장 프로그램으로 전달</summary><p className="ws-helper">연결된 Chrome 확장 프로그램에서 ‘AI 글 채우기’를 누르세요. 실제 첨부·발행 여부는 직접 확인해야 해요.</p><button type="button" className="ws-button ws-button-wide" disabled={payloadBusy || !payload} onClick={() => { log("확장 프로그램용 데이터 복사"); void copy(payload, "확장 프로그램용 데이터를 복사했어요."); }}>{payloadBusy ? "이미지 데이터 준비 중…" : "확장 프로그램용 데이터 복사"}</button><p className="ws-helper">{images.length}장 포함</p></details></UiDialog>
+    <UiDialog open={sendOpen} title="당근 발행 준비" onClose={() => setSendOpen(false)}><div className="ws-note"><UiIcon name="info" size={18} />자동입력 후 내용을 확인하고 당근의 등록 버튼을 직접 눌러주세요.</div><div><h3 className="ws-label">1. 글을 복사하세요</h3><button type="button" className="ws-button ws-button-wide" onClick={() => void copy(exportText(), "제목·본문·해시태그를 복사했어요.")}>글 전체 복사</button></div><div><h3 className="ws-label">2. 이미지를 준비하세요</h3><div className="ws-secondary-actions">{images.map((url, i) => <a key={i} href={url} download={`post-image-${i + 1}.jpg`} className="ws-button">이미지 {i + 1} 저장</a>)}</div></div><div><h3 className="ws-label">3. 당근에 글을 보내세요</h3><button type="button" className="ws-button ws-button-wide" onClick={openDaangnCompose}>금박사 소식 작성 열기<UiIcon name="external" size={17} /></button><button type="button" className="ws-button ws-button-primary ws-button-wide ws-form-group" disabled={payloadBusy || !payload} onClick={sendToDaangn}>{payloadBusy ? "이미지 데이터 준비 중…" : "글 보내기"}<UiIcon name="arrow" size={17} /></button><p className="ws-helper ws-form-group">작성 화면은 새로 늘리지 않고 기존 당근 탭을 재사용합니다. 글 보내기를 누르면 제목·본문·이미지를 자동으로 입력합니다.</p></div><details className="ws-disclosure"><summary>고급 · PC 확장 프로그램으로 전달</summary><p className="ws-helper">자동입력이 안 될 때 확장프로그램의 ‘AI 글 채우기’를 누르세요.</p><button type="button" className="ws-button ws-button-wide" disabled={payloadBusy || !payload} onClick={() => { log("확장 프로그램용 데이터 복사"); void copy(payload, "확장 프로그램용 데이터를 복사했어요."); }}>확장프로그램용 데이터 복사</button><p className="ws-helper">{images.length}장 포함</p></details></UiDialog>
     {toast && <div className="ws-toast" role="status">{toast}</div>}
   </div>;
 }

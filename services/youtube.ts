@@ -25,15 +25,16 @@ export async function searchGoldTopics(opts: {
   if (!key) return { videos: [], demo: true };
 
   const { keywords, days, maxPerKeyword = 5 } = opts;
-  const publishedAfter = new Date(Date.now() - days * 864e5).toISOString();
+  // Stable within an hour so identical searches reuse the provider response.
+  const publishedAfter = new Date(Math.floor(Date.now() / 3600000) * 3600000 - days * 864e5).toISOString();
   const order = opts.sort === "recent" ? "date" : opts.sort === "views" ? "viewCount" : "relevance";
 
   const all: TrendVideo[] = [];
-  for (const kw of keywords.slice(0, 6)) {
+  for (const kw of keywords.slice(0, 2)) {
     try {
       const sRes = await fetch(
         `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxPerKeyword}&order=${order}&publishedAfter=${publishedAfter}&q=${encodeURIComponent(kw + " 금")}&key=${key}`,
-        { next: { revalidate: 3600 } }
+        { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) }
       );
       if (!sRes.ok) continue;
       const sJson = await sRes.json();
@@ -41,7 +42,7 @@ export async function searchGoldTopics(opts: {
       if (!ids.length) continue;
       const vRes = await fetch(
         `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${ids.join(",")}&key=${key}`,
-        { next: { revalidate: 3600 } }
+        { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) }
       );
       if (!vRes.ok) continue;
       const vJson = await vRes.json();
@@ -75,7 +76,7 @@ export async function fetchComments(videoId: string, max = 40): Promise<{ commen
   try {
     const r = await fetch(
       `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=${Math.min(100, max)}&orderBy=relevance&textFormat=plainText&key=${key}`,
-      { next: { revalidate: 3600 } }
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(10000) }
     );
     const j = await r.json().catch(() => ({}));
     if (!r.ok) {

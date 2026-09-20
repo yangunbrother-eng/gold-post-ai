@@ -9,10 +9,12 @@ const TABS: { href: string; label: string; icon: IconName; ariaLabel?: string }[
   { href: "/", label: "홈", icon: "home" },
   { href: "/create", label: "소식 만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
   { href: "/trends", label: "유튜브", icon: "youtube", ariaLabel: "유튜브에서 주제 찾기" },
+  { href: "/daangn", label: "당근 소식", icon: "carrot", ariaLabel: "당근 인기 소식" },
   { href: "/library", label: "보관함", icon: "folder" },
   { href: "/calendar", label: "캘린더", icon: "calendar" },
 ];
 const MENUS: { href: string; label: string; desc: string; icon: IconName }[] = [
+  { href: "/daangn", label: "당근 인기 소식", desc: "실제 조회수 · 인기 소식에서 주제 찾기", icon: "carrot" },
   { href: "/recommend", label: "추천 주제", desc: "다음 글의 아이디어 찾기", icon: "sparkles" },
   { href: "/trends", label: "유튜브에서 주제 찾기", desc: "영상 검색 · 제목과 댓글 분석", icon: "youtube" },
   { href: "/create#images", label: "소식 이미지", desc: "작성한 글에 이미지 더하기", icon: "image" },
@@ -79,6 +81,7 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
           <div className="section-heading"><div><p className="eyebrow">나의 작업 도구</p><h2 id="menu-title">전체 메뉴</h2></div><button autoFocus type="button" onClick={close} className="icon-button" aria-label="전체 메뉴 닫기"><Icon name="close" /></button></div>
           <div className="branch-control"><label htmlFor="menu-branch">현재 사업장</label><select id="menu-branch" value={activeBranchId} onChange={(event) => switchBranch(event.target.value)}>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></div>
           <nav className="menu-list" aria-label="추가 메뉴">{MENUS.map((menu) => <Link key={menu.href} href={menu.href} onClick={close} className={`menu-link ${path === menu.href ? "is-active" : ""}`} aria-current={path === menu.href ? "page" : undefined}><span className="soft-icon"><Icon name={menu.icon} /></span><span className="menu-label"><strong>{menu.label}</strong><small>{menu.desc}</small></span><Icon name="chevron" size={16} /></Link>)}</nav>
+          <button type="button" className="menu-link" onClick={async () => { await fetch("/api/logout", { method: "POST" }); window.location.assign("/login"); }}><span className="soft-icon"><Icon name="close" /></span><span className="menu-label"><strong>로그아웃</strong><small>로그인 화면으로 돌아가기</small></span><Icon name="chevron" size={16} /></button>
           <p className="menu-note">복잡한 설정은 여기에서, 자주 하는 일은 상단 메뉴에서.</p>
         </div>
       </dialog>

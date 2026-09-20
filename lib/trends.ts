@@ -44,24 +44,22 @@ export interface CarrotTitle {
   scores: { interest: number; recency: number; overlap: number; recommend: number };
 }
 
-export const DEFAULT_KEYWORDS = [
-  "금값", "금시세", "금 팔때", "금매입", "금값 전망", "순금",
-  "24K", "18K", "14K", "돌반지", "금목걸이", "금반지",
-  "금테크", "금값 상승", "금값 하락", "금 팔기",
-  "금 살때", "오래된 금", "금 감정"
-];
+export const DEFAULT_KEYWORDS = ["금값", "금시세"];
 
 const K_KEYS = "cpai_trend_keywords_v1";
 export function loadKeywords(): string[] {
   if (typeof window === "undefined") return DEFAULT_KEYWORDS;
   try {
     const raw = localStorage.getItem(K_KEYS);
-    if (raw) return JSON.parse(raw) as string[];
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (Array.isArray(saved)) return saved.filter((k): k is string => typeof k === "string" && !!k.trim()).slice(0, 2);
+    }
   } catch {}
   return DEFAULT_KEYWORDS;
 }
 export function saveKeywords(k: string[]) {
-  try { localStorage.setItem(K_KEYS, JSON.stringify(k)); } catch {}
+  try { localStorage.setItem(K_KEYS, JSON.stringify(k.slice(0, 2))); } catch {}
 }
 
 // ── 지표 계산 ──

@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import Topbar from "@/components/Topbar";
-import Icon, { type IconName } from "@/components/Icon";
+import PopularDaangn from "@/components/PopularDaangn";
+import Icon from "@/components/Icon";
 import { useBrand, useContents, todayStr } from "@/lib/store";
 
 type GoldRow = {
@@ -26,12 +27,6 @@ type GoldPriceData = {
   stale?: boolean;
   rows: GoldRow[];
 };
-
-const IDEAS: { tag: string; title: string; description: string; icon: IconName }[] = [
-  { tag: "질문에 답하기", title: "작은 금 조각도 팔 수 있나요?", description: "처음 문의하는 고객의 궁금증을 풀어주세요.", icon: "message" },
-  { tag: "방문 안내", title: "가게에 오기 전, 이것만 확인하세요", description: "영업시간과 위치를 한 편의 소식으로 정리해요.", icon: "pin" },
-  { tag: "가게 이야기", title: "우리 가게만의 상담 과정을 소개해요", description: "실제 서비스 과정을 알려 신뢰를 쌓아보세요.", icon: "store" },
-];
 
 const createLink = (topic: string) => `/create?topic=${encodeURIComponent(topic)}`;
 const won = (value: number | null) => value == null ? "–" : Math.round(value).toLocaleString("ko-KR");
@@ -184,11 +179,7 @@ export default function Dashboard() {
           <div className="work-summary"><span>작성 중 <b>{loaded ? stats.drafts : "–"}</b>건</span><span>발행한 소식 <b>{loaded ? stats.published : "–"}</b>건</span><Link href="/library">모두 보기<Icon name="arrow" size={15} /></Link></div>
         </section>
 
-        <section aria-labelledby="ideas-title">
-          <div className="section-heading"><div><h2 id="ideas-title">이 주제로 시작해 보세요</h2><p className="section-description">가게 소식에 활용하기 좋은 기본 아이디어예요.</p></div></div>
-          <div className="ideas-list">{IDEAS.map((idea, index) => <Link className="idea-card" key={idea.title} href={createLink(idea.title)}><span className={`soft-icon idea-icon tone-${index}`}><Icon name={idea.icon} size={23} /></span><span className="idea-content"><small>{idea.tag}</small><strong>{idea.title}</strong><span>{idea.description}</span></span><Icon name="chevron" size={18} /></Link>)}</div>
-          <Link href="/recommend" className="quiet-link">다른 추천 주제 보기<Icon name="arrow" size={16} /></Link>
-        </section>
+        <PopularDaangn preview />
 
         <section aria-labelledby="recent-title" aria-busy={!loaded}>
           <div className="section-heading"><h2 id="recent-title">최근 작업한 소식</h2><Link href="/library" className="text-link">보관함<Icon name="arrow" size={16} /></Link></div>

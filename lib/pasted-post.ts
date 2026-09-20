@@ -14,6 +14,11 @@ function normalize(text: string): string {
   return text.replace(/\r\n?/g, "\n").replace(/[\u2028\u2029]/g, "\n")
     .replace(/[\u200B\uFEFF]/g, "").replace(/\u00a0/g, " ").trim();
 }
+export function isWritingPrompt(value: string): boolean {
+  const text = normalize(value);
+  return /당근 비즈프로필/.test(text) && /\[주제\]/.test(text)
+    && (/\[참고 자료\]/.test(text) || /출력 형식\s*\(반드시 지킬 것\)/.test(text));
+}
 function unFence(text: string): string {
   const match = /^(?:```|~~~)[^\n]*\n([\s\S]*?)\n(?:```|~~~)\s*$/.exec(text);
   return match ? match[1].trim() : text;
@@ -63,6 +68,7 @@ function jsonPost(text: string): PastedPost | null {
 }
 
 export function splitPasted(value: string): PastedPost {
+  if (isWritingPrompt(value)) return { ...EMPTY };
   let text = unFence(normalize(value));
   if (!text) return { ...EMPTY };
   const json = jsonPost(text);

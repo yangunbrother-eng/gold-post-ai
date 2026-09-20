@@ -1,12 +1,12 @@
 const $ = (id) => document.getElementById(id);
-const SITE_URL = "http://localhost:3000/create";
+const SITE_URL = "https://goldcheju.vercel.app/create";
 
 function render(payload) {
   const connected = !!(payload && payload.title && payload.body);
   $("conn").className = connected ? "on" : "off";
   $("conn").textContent = connected
-    ? "● 연결됨 (" + String(payload.title).slice(0, 18) + "…)"
-    : "○ 미연결 — 아래 연결 버튼을 눌러주세요";
+    ? "● 당근 발행 데이터 준비됨 (" + String(payload.title).slice(0, 18) + "…)"
+    : "○ 당근에 보낼 글이 아직 없습니다";
   $("connectView").classList.toggle("hidden", connected);
   $("readyView").classList.toggle("hidden", !connected);
   if (connected) {

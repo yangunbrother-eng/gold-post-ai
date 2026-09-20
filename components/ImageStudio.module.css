@@ -26,14 +26,14 @@
 .secondary { background:#fff; color:#526259; }
 .note { color:#755f47; background:#fff7ee; border:1px solid #f6e2cc; padding:13px; border-radius:12px; font-size:12px; line-height:1.8; margin:0 0 16px; }
 .feedback { color:#285c42; background:#edf6ef; padding:13px; border-radius:12px; font-size:13px; line-height:1.7; margin-top:12px; }
-.gallery { display:flex; flex-direction:column; gap:16px; margin-top:18px; }
+.gallery { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:14px; }
 .slot { border:1px solid #e1e6e1; border-radius:18px; overflow:hidden; min-width:0; }
-.image { position:relative; background:#f6f8f5; aspect-ratio:3/2; display:grid; place-items:center; }
+.image { position:relative; background:#f6f8f5; aspect-ratio:4/3; display:grid; place-items:center; }
 .image img { width:100%; height:100%; object-fit:contain; position:absolute; inset:0; }
 .placeholder { color:#7c8c80; text-align:center; font-size:13px; }
 .placeholder span { display:block; font-size:32px; font-weight:300; color:#bc7345; }
 .overlay { position:absolute; inset:0; background:#fffdf1e6; display:grid; place-items:center; color:#a23c0e; font-size:15px; font-weight:700; }
-.slotBody { padding:16px; }
+.slotBody { padding:12px; }
 .badge { font-size:10px; white-space:nowrap; padding:4px 8px; border-radius:8px; background:#f0f4ee; color:#55735e; }
 .warning { font-size:12px; line-height:1.7; color:#9e4320; background:#fff5eb; padding:10px; border-radius:10px; margin:10px 0; }
 .disclosure { margin-top:12px; font-size:12px; color:#5c7163; }
@@ -47,4 +47,5 @@
 .download { display:flex; justify-content:center; align-items:center; min-height:44px; font-size:12px; color:#556c5b; margin-top:8px; }
 .disabled, .root :disabled { opacity:.5; cursor:not-allowed; }
 @media (hover:hover) { .primary:hover:enabled { background:#a8370c; } .secondary:hover:enabled, .actions button:hover:enabled, .actions label:hover { background:#faf5ee; } }
+@media (max-width:640px) { .gallery { grid-template-columns:1fr; } }
 @media (max-width:380px) { .panel { padding:16px; } .heading { gap:8px; } .root h2 { font-size:19px; } .secondary { padding-inline:10px; } }

@@ -12,7 +12,7 @@ const { outputText, diagnostics } = ts.transpileModule(fs.readFileSync(filename,
 assert.equal(diagnostics.length, 0, 'parser must compile');
 const exported = {};
 new Function('exports', outputText)(exported);
-const { splitPasted } = exported;
+const { splitPasted, isWritingPrompt } = exported;
 const title = '끊어진 금목걸이도 상담해 드려요';
 const body = '끊어져서 보관만 하던 목걸이가 있나요?\n\n상태를 확인한 뒤 매입 가능 여부를 안내해 드려요.\n제주점 방문 전에 문의해 주세요.';
 const tags = '#제주금매입 #금박사';
@@ -105,4 +105,9 @@ test('composer contract: hashtag-only copy does not overwrite the draft', () => 
   const parsed = splitPasted(`해시태그:\n${tags}`);
   if (parsed.title && parsed.body) Object.assign(state, parsed);
   assert.deepEqual(state, { title, body });
+});
+test('writing prompt is never treated as a completed post', () => {
+  const prompt = `당근 비즈프로필(동네 가게 소식) 글을 작성해줘. 반드시 아래 형식 그대로 출력해줘.\n\n[주제] 돌반지 가격\n[참고 자료]\n검색 내용\n\n출력 형식(반드시 지킬 것):\n제목: (30자 이내 한 줄)\n본문:\n(여기에 본문 전체)\n해시태그: #태그1 #태그2 #태그3`;
+  assert.equal(isWritingPrompt(prompt), true);
+  assert.deepEqual(splitPasted(prompt), { title: '', body: '' });
 });

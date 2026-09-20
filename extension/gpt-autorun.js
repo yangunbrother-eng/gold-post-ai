@@ -18,6 +18,13 @@
     const hashParams = new URLSearchParams((location.hash || "").replace(/^#/, ""));
     const directPrompt = hashParams.get("prompt");
     if (directPrompt) sessionStorage.setItem("cpai_prompt", directPrompt);
+    if (hashParams.get("requestId")) sessionStorage.setItem("cpai_request_id", hashParams.get("requestId"));
+    if (hashParams.get("mode") === "image") {
+      sessionStorage.setItem("cpai_mode", "image");
+      sessionStorage.setItem("cpai_image_count", hashParams.get("count") || "1");
+      sessionStorage.setItem("cpai_image_slots", hashParams.get("slots") || "0");
+      sessionStorage.setItem("cpai_request_id", hashParams.get("requestId") || String(Date.now()));
+    }
   } catch (e) {}
 
   // 이전 버전 호환: q 파라미터가 있다면 세션에 보관
@@ -129,13 +136,96 @@
         else { stable = 0; lastLen = text.length; }
         if (stable >= 2) {
           clearInterval(iv);
-          await navigator.clipboard.writeText(text);
+          let copied = false;
+          try { await navigator.clipboard.writeText(text); copied = true; } catch (e) {}
+          await chrome.storage.local.set({
+            cpai_generated_text: {
+              requestId: sessionStorage.getItem("cpai_request_id") || String(Date.now()),
+              text,
+              createdAt: Date.now()
+            }
+          });
           sessionStorage.setItem("cpai_copied", "1");
-          toast("✓ 초안 복사됨! 사이트로 돌아가면 자동 입력됩니다");
+          toast(copied ? "✓ 초안 복사됨! 사이트로 돌아가면 자동 입력됩니다" : "✓ 초안을 사이트로 전송했어요");
         }
       } catch (e) {}
     }, 2000);
     setTimeout(() => clearInterval(iv), 300000);
+  };
+  const imageToDataUrl = async (image) => {
+    const src = image.currentSrc || image.src || "";
+    if (/^data:image\/(png|jpeg|webp);base64,/i.test(src)) return src;
+    if (!src) return "";
+    let blob;
+    try {
+      const response = await fetch(src, { credentials: "include" });
+      if (!response.ok) throw new Error("image download failed");
+      blob = await response.blob();
+    } catch (e) {
+      const result = await chrome.runtime.sendMessage({ type: "cpai-fetch-image", url: src });
+      if (!result?.dataUrl) throw e;
+      blob = await (await fetch(result.dataUrl)).blob();
+    }
+    if (!blob.type.startsWith("image/") || blob.size > 20 * 1024 * 1024) throw new Error("invalid image");
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, 1536 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("canvas unavailable");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    return canvas.toDataURL("image/jpeg", 0.84);
+  };
+  const chatGeneratedImages = () => {
+    const answers = document.querySelectorAll("div[data-message-author-role='assistant']");
+    const last = answers[answers.length - 1];
+    const scoped = last ? [...last.querySelectorAll("img")] : [];
+    const candidates = scoped.length ? scoped : [...document.querySelectorAll("img")];
+    return candidates.filter((image) => {
+      const src = image.currentSrc || image.src || "";
+      const alt = (image.alt || "").toLowerCase();
+      return !!src && (image.naturalWidth >= 256 || image.naturalHeight >= 256 || alt.includes("generated") || alt.includes("생성"));
+    });
+  };
+  const watchAndStoreImages = (getImages, isBusy) => {
+    if (sessionStorage.getItem("cpai_images_stored") === "1") return;
+    const wanted = Math.min(2, Math.max(1, Number(sessionStorage.getItem("cpai_image_count")) || 1));
+    const slots = (sessionStorage.getItem("cpai_image_slots") || "0").split(",").map(Number).filter(Number.isInteger).slice(0, wanted);
+    const requestId = sessionStorage.getItem("cpai_request_id") || String(Date.now());
+    let signature = "", stable = 0;
+    const iv = setInterval(async () => {
+      try {
+        if (isBusy()) { stable = 0; return; }
+        const images = getImages().slice(-wanted);
+        if (!images.length) { stable = 0; return; }
+        const next = images.map(image => image.currentSrc || image.src || "").join("|");
+        if (next === signature) stable++;
+        else { signature = next; stable = 0; }
+        if (stable < 2) return;
+        clearInterval(iv);
+        const converted = [];
+        for (let i = 0; i < images.length; i++) {
+          try {
+            const dataUrl = await imageToDataUrl(images[i]);
+            if (dataUrl) converted.push({ dataUrl, slot: Number.isInteger(slots[i]) ? slots[i] : i });
+          } catch (e) {}
+        }
+        if (!converted.length) {
+          toast("이미지는 완성됐지만 자동 가져오기에 실패했어요. 이미지 저장 후 파일 선택을 이용해 주세요.");
+          return;
+        }
+        await chrome.storage.local.set({
+          cpai_generated_images: { requestId, images: converted, createdAt: Date.now() }
+        });
+        sessionStorage.setItem("cpai_images_stored", "1");
+        toast(`✓ 이미지 ${converted.length}장이 사이트 갤러리로 전송됐어요`);
+      } catch (e) {}
+    }, 2000);
+    setTimeout(() => clearInterval(iv), 600000);
   };
   const chatLastText = () => {
     const all = document.querySelectorAll("div[data-message-author-role='assistant']");
@@ -149,6 +239,17 @@
     return el ? el.innerText || "" : "";
   };
   const gemBusy = () => !!document.querySelector("mat-progress-spinner, mat-spinner, [role='progressbar']");
+  const gemGeneratedImages = () => {
+    const answers = document.querySelectorAll("message-content.model-response, .model-response, message-content");
+    const last = answers[answers.length - 1];
+    const scoped = last ? [...last.querySelectorAll("img")] : [];
+    const candidates = scoped.length ? scoped : [...document.querySelectorAll("img")];
+    return candidates.filter((image) => {
+      const src = image.currentSrc || image.src || "";
+      const alt = (image.alt || "").toLowerCase();
+      return !!src && (image.naturalWidth >= 256 || image.naturalHeight >= 256 || alt.includes("generated") || alt.includes("생성"));
+    });
+  };
 
   // ---- ChatGPT 자동 입력 및 전송 ----
   const autoChatGPT = async () => {
@@ -248,10 +349,12 @@
         // AIPRM 환경: Enter 먼저 → 그래도 안 되면 버튼 click
         if (box) sendViaEnter(box);
         await new Promise(r => setTimeout(r, 300));
-        if (btn) btn.click();
+        const stillWaiting = !!box?.isConnected && !!box.textContent?.trim() && !chatBusy();
+        if (stillWaiting && btn?.isConnected && document.documentElement.contains(btn)) btn.click();
 
         toast("✦ 당근 Post AI: GPT가 소식지를 자동 작성 중입니다!");
-        watchAndCopy(chatLastText, chatBusy);
+        if (sessionStorage.getItem("cpai_mode") === "image") watchAndStoreImages(chatGeneratedImages, chatBusy);
+        else watchAndCopy(chatLastText, chatBusy);
       } else if (tries > 80) {
         clearInterval(iv);
         if (box && prompt && (!box.textContent || box.textContent.trim().length === 0)) {
@@ -312,7 +415,8 @@
           }));
         }
         toast("✦ 당근 Post AI: Gemini가 소식지를 자동 작성 중입니다!");
-        watchAndCopy(gemLastText, gemBusy);
+        if (sessionStorage.getItem("cpai_mode") === "image") watchAndStoreImages(gemGeneratedImages, gemBusy);
+        else watchAndCopy(gemLastText, gemBusy);
       } else if (tries > 80) {
         clearInterval(iv);
         if (box && prompt && (!box.textContent || box.textContent.trim().length === 0)) {

@@ -11,6 +11,10 @@ import {
 
 type SortMode = "views" | "recent" | "engaged" | "rising";
 
+const VIDEO_CACHE_KEY = "cpai_youtube_last_results_v1";
+
+const KEYWORD_OPTIONS = ["금값", "금시세", "금매입", "순금", "24K", "18K", "14K", "돌반지", "금목걸이", "금반지", "금테크", "금값 상승", "금값 하락", "금 팔기", "금 살때", "오래된 금", "금 감정"];
+
 const SORTS: { id: SortMode; label: string }[] = [
   { id: "views", label: "조회수 높은 순" },
   { id: "recent", label: "최근 업로드" },
@@ -20,10 +24,10 @@ const SORTS: { id: SortMode; label: string }[] = [
 
 function Thumb({ v }: { v: TrendVideo }) {
   const [err, setErr] = useState(false);
-  const real = !v.videoId.startsWith("au");
+  const real = /^[A-Za-z0-9_-]{11}$/.test(v.videoId);
   if (real && !err) {
     return (
-      <div className="relative w-full sm:w-[168px] shrink-0 aspect-video rounded-xl overflow-hidden bg-neutral-900">
+      <div className="trend-thumb">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`} alt="" className="w-full h-full object-cover" onError={() => setErr(true)} loading="lazy" />
         <span className="absolute bottom-1.5 right-1.5 text-[10px] font-bold bg-black/70 text-white rounded px-1.5 py-0.5">▶ YouTube</span>
@@ -31,10 +35,10 @@ function Thumb({ v }: { v: TrendVideo }) {
     );
   }
   return (
-    <div className="relative w-full sm:w-[168px] shrink-0 aspect-video rounded-xl overflow-hidden bg-neutral-900 flex flex-col items-center justify-center text-center px-3">
-      <span className="text-white/90 text-[22px]">▶</span>
+    <div className="trend-thumb trend-thumb-empty">
+      <span className="text-[18px]">{real ? "영상" : "예시"}</span>
       <span className="text-white font-extrabold text-[13px] leading-tight mt-1 line-clamp-2">{v.keyword}</span>
-      <span className="text-white/50 text-[10.5px] font-bold mt-1">트렌드 수집 영상</span>
+      <span className="text-white/50 text-[10.5px] font-bold mt-1">{real ? "이미지 불러오기 실패" : "실제 영상 아님"}</span>
     </div>
   );
 }
@@ -54,11 +58,13 @@ export default function TrendsPage() {
   const { brand } = useBrand();
   const { items } = useContents();
   const [keywords, setKeywords] = useState<string[]>(loadKeywords());
+  const [customKeywords, setCustomKeywords] = useState<string[]>([]);
   const [newKw, setNewKw] = useState("");
   const [days, setDays] = useState(30);
   const [sort, setSort] = useState<SortMode>("views");
   const [videos, setVideos] = useState<TrendVideo[]>([]);
   const [demo, setDemo] = useState(true);
+  const [showingSaved, setShowingSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [analyzedId, setAnalyzedId] = useState<string | null>(null);
   const [madeTitle, setMadeTitle] = useState<Record<string, { title: string; similarity: number }>>({});
@@ -96,17 +102,31 @@ export default function TrendsPage() {
   const fetchVideos = async (kws: string[], d: number, s: SortMode) => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/youtube/search?keywords=${encodeURIComponent(kws.slice(0, 8).join(","))}&days=${d}&sort=${s}`);
+      const r = await fetch(`/api/youtube/search?keywords=${encodeURIComponent(kws.slice(0, 2).join(","))}&days=${d}&sort=${s}`);
       const j = await r.json();
-      setVideos(j.videos ?? []);
-      setDemo(j.demo ?? true);
+      if (r.ok && j.demo === false && Array.isArray(j.videos) && j.videos.length) {
+        setVideos(j.videos); setDemo(false); setShowingSaved(false);
+        try { localStorage.setItem(VIDEO_CACHE_KEY, JSON.stringify(j.videos)); } catch {}
+      } else {
+        setShowingSaved(true);
+        setVideos((previous) => previous.length ? previous : (j.videos ?? []));
+      }
     } catch {
-      setVideos([]); setDemo(true);
+      setShowingSaved(true);
     }
     setLoading(false);
   };
 
-  useEffect(() => { fetchVideos(keywords, days, sort); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(VIDEO_CACHE_KEY) ?? "null");
+      if (Array.isArray(saved) && saved.length && saved.every((v) => v && typeof v.videoId === "string" && /^[A-Za-z0-9_-]{11}$/.test(v.videoId) && typeof v.title === "string" && typeof v.url === "string")) {
+        setVideos(saved); setDemo(false); setShowingSaved(true);
+      }
+    } catch {}
+    fetchVideos(keywords, days, sort);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, []);
 
   const scored: VideoMetrics[] = useMemo(() => {
     const list = videos.map(scoreVideo);
@@ -120,8 +140,9 @@ export default function TrendsPage() {
   const addKw = () => {
     const k = newKw.trim();
     if (!k || keywords.includes(k)) return;
+    if (keywords.length >= 2) { say("검색 키워드는 최대 2개입니다. 기존 키워드를 빼고 추가해 주세요."); return; }
     const next = [...keywords, k];
-    setKeywords(next); saveKeywords(next); setNewKw("");
+    setKeywords(next); saveKeywords(next); setCustomKeywords((p) => Array.from(new Set([...p, k]))); setNewKw("");
   };
 
   // 오늘 인기 제목 10개: 영상 패턴 7 + 댓글 질문 섞기
@@ -174,8 +195,10 @@ export default function TrendsPage() {
               <h1 className="text-[26px] font-black tracking-tight">🔥 유튜브 인기 콘텐츠 분석</h1>
               <p className="text-[13.5px] text-neutral-500 mt-1">인기 영상을 복사하지 않고, 지금 관심받는 <b>주제·제목 패턴</b>만 추출해 당근용으로 재가공합니다.</p>
             </div>
-            {demo && <span className="text-[11.5px] font-bold text-neutral-500 bg-neutral-100 border border-neutral-200 rounded-full px-3 py-1.5">현재 데모 데이터 사용 중 · API Key 연결 시 실측 전환</span>}
+            {demo && <span className="text-[11.5px] font-bold text-neutral-500 bg-neutral-100 border border-neutral-200 rounded-full px-3 py-1.5">실제 영상 검색 결과가 없어 예시를 표시합니다. 예시에는 썸네일이 없습니다.</span>}
           </div>
+
+          {showingSaved && !demo && <p role="status" className="text-[13px] text-neutral-600">새 검색 결과를 가져오지 못해 마지막으로 불러온 영상을 표시합니다. 썸네일과 영상 링크는 계속 이용할 수 있습니다.</p>}
 
           {/* 오늘 금 시세 (국제시세 기준) */}
           <section className="card p-5 flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -201,17 +224,22 @@ export default function TrendsPage() {
           {/* 검색 조건 */}
           <section className="card p-5 space-y-3.5">
             <div>
-              <div className="label mb-2">검색 키워드 · 클릭으로 제외, 직접 추가 가능</div>
+              <div className="label mb-2">검색 키워드 · 최대 2개 선택 · 다시 누르면 선택 해제</div>
               <div className="flex flex-wrap gap-1.5">
-                {keywords.map((k) => (
-                  <button key={k} title="클릭 시 제외" onClick={() => { const n = keywords.filter((x) => x !== k); setKeywords(n); saveKeywords(n); }}
-                    className="chip !text-[12.5px]">#{k} <span className="text-neutral-300">✕</span></button>
+                {Array.from(new Set([...KEYWORD_OPTIONS, ...customKeywords, ...keywords])).map((k) => (
+                  <button key={k} aria-pressed={keywords.includes(k)} onClick={() => {
+                    if (!keywords.includes(k) && keywords.length >= 2) { say("최대 2개까지 선택할 수 있어요. 선택한 키워드를 해제해 주세요."); return; }
+                    const next = keywords.includes(k) ? keywords.filter((x) => x !== k) : [...keywords, k];
+                    setKeywords(next); saveKeywords(next);
+                  }} className={`chip !text-[12.5px] ${keywords.includes(k) ? "active" : ""}`}>
+                    #{k} {keywords.includes(k) && <span aria-hidden="true">✓</span>}
+                  </button>
                 ))}
               </div>
               <div className="mt-2 flex flex-wrap sm:flex-nowrap gap-2">
                 <input value={newKw} onChange={(e) => setNewKw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addKw()}
-                  placeholder="키워드 추가 (예: 금은방)" className="w-full sm:w-auto flex-1 sm:max-w-[260px] rounded-xl border border-neutral-200 px-3.5 py-2.5 text-[13px] outline-none focus:border-neutral-400" />
-                <button onClick={addKw} className="btn-ghost flex-1 sm:flex-none px-4 py-2.5 text-[13px] font-bold">＋ 추가</button>
+                  disabled={keywords.length >= 2} placeholder={keywords.length >= 2 ? "선택을 해제하면 추가할 수 있어요" : "키워드 추가 (예: 금은방)"} className="w-full sm:w-auto flex-1 sm:max-w-[260px] rounded-xl border border-neutral-200 px-3.5 py-2.5 text-[13px] outline-none focus:border-neutral-400" />
+                <button onClick={addKw} disabled={keywords.length >= 2} className="btn-ghost flex-1 sm:flex-none px-4 py-2.5 text-[13px] font-bold">＋ 추가</button>
                 <button onClick={() => fetchVideos(keywords, days, sort)} className="btn-primary flex-1 sm:flex-none px-5 py-2.5 text-[13px] font-bold">검색 실행</button>
               </div>
             </div>
@@ -262,7 +290,7 @@ export default function TrendsPage() {
           {/* 영상 리스트 */}
           <section className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <h3 className="font-extrabold text-[15px]">인기 영상 리스트 <span className="text-neutral-400 text-[12px] font-semibold">{scored.length}건</span></h3>
+              <h3 className="font-extrabold text-[15px]">{demo ? "주제 예시 목록" : "인기 영상 리스트"} <span className="text-neutral-400 text-[12px] font-semibold">{scored.length}건</span></h3>
               {loading && <span className="text-[12px] font-bold text-neutral-400 typing">수집 중</span>}
             </div>
             {scored.map((m) => {
@@ -271,11 +299,11 @@ export default function TrendsPage() {
               const made = madeTitle[m.videoId];
               const open = analyzedId === m.videoId;
               return (
-                <article key={m.videoId} className="card p-4">
-                  <div className="flex flex-col sm:flex-row gap-3.5">
+                <article key={m.videoId} className="card trend-video-card">
+                  <div className="trend-video-row">
                     <Thumb v={m} />
-                    <div className="flex-1 min-w-0">
-                      <a href={m.url} target="_blank" rel="noreferrer" className="font-bold text-[14px] leading-snug hover:underline line-clamp-2">{m.title}</a>
+                    <div className="trend-video-copy">
+                      <a href={demo ? `https://www.youtube.com/results?search_query=${encodeURIComponent(m.keyword)}` : m.url} target="_blank" rel="noreferrer" className="font-bold text-[14px] leading-snug hover:underline line-clamp-2">{m.title}</a>
                       <div className="mt-1 text-[12px] text-neutral-400">{m.channel} · {m.publishedAt} ({m.daysSince}일 전) · #{m.keyword}</div>
                       <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] font-semibold text-neutral-600">
                         <span>조회 {fmtNum(m.views)}</span><span>좋아요 {fmtNum(m.likes)}</span><span>댓글 {fmtNum(m.comments)}</span>

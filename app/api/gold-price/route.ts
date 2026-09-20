@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 
 type PriceRecord = Record<string, unknown>;
 type GoldRow = {

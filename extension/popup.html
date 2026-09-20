@@ -20,31 +20,32 @@
 </style>
 </head>
 <body>
-  <div style="font-size:11px;font-weight:900;color:#FF6F0F;margin-bottom:8px;letter-spacing:-0.2px;">당근 Post AI 자동입력 feat. 양윤석</div>
+  <div style="font-size:11px;font-weight:900;color:#FF6F0F;margin-bottom:8px;letter-spacing:-0.2px;">당근 Post AI 확장프로그램 · v1.5.11</div>
   <h1>🥕 당근 Post AI</h1>
-  <div id="conn" class="off">○ 미연결 — 아래 연결 버튼을 눌러주세요</div>
+  <div id="conn" class="off">○ 당근에 보낼 글이 아직 없습니다</div>
 
   <!-- 미연결 상태 -->
   <div id="connectView">
+    <p><b>아이콘을 고정하지 않아도 자동 기능은 작동합니다.</b> 이 창은 당근 발행 상태를 확인하거나 수동으로 넣을 때만 사용하세요.</p>
     <ol>
-      <li><b>연결하기</b>를 눌러 사이트를 엽니다</li>
-      <li>사이트에서 글을 만들고 <b>당근에 보내기</b>를 누릅니다</li>
-      <li>당근 작성 페이지에서 <b>✦ AI 글 채우기</b>를 누르면 끝!</li>
+      <li>사이트에서 글과 이미지를 만듭니다</li>
+      <li><b>당근 발행 준비</b>를 누르면 이 확장에 자동 저장됩니다</li>
+      <li>당근 작성 페이지의 <b>✦ AI 글 채우기</b>를 누릅니다</li>
     </ol>
-    <button class="primary" id="connect">🔗 연결하기 (사이트 열기)</button>
-    <p style="margin-top:10px;">직접 Payload를 붙여넣어 연결할 수도 있어요.</p>
+    <button class="primary" id="connect">소식 만들기 사이트 열기</button>
+    <p style="margin-top:10px;">자동 저장이 안 될 때만 아래에 발행 데이터를 붙여넣으세요.</p>
     <textarea id="payload" placeholder='{"title": "...", "body": "..."}'></textarea>
-    <button class="ghost" id="save">붙여넣은 내용으로 연결</button>
+    <button class="ghost" id="save">붙여넣은 발행 데이터 저장</button>
   </div>
 
   <!-- 연결됨 상태 -->
   <div id="readyView" class="hidden">
-    <p>당근 소식 작성 페이지를 열고 <b>✦ AI 글 채우기</b> 버튼만 누르세요. (클립보드에서도 바로 읽습니다.)</p>
+    <p>당근 소식 작성 페이지를 열고 <b>✦ AI 글 채우기</b> 버튼을 누르세요. 제목·본문·이미지가 들어갑니다.</p>
     <div id="titlePreview"></div>
     <button class="primary" id="copyBoth">📋 제목+본문 복사</button>
     <button class="ghost" id="copyTitle">저장된 제목 복사</button>
     <button class="ghost" id="copyBody">저장된 본문 복사</button>
-    <button class="danger" id="disconnect">연결 끊기</button>
+    <button class="danger" id="disconnect">저장된 발행 데이터 지우기</button>
   </div>
 
   <script src="popup.js"></script>
