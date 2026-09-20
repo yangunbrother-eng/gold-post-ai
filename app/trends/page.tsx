@@ -99,7 +99,7 @@ export default function TrendsPage() {
     if (cData[m.videoId] && !cData[m.videoId].loading) return;
     setCData((p) => ({ ...p, [m.videoId]: { loading: true } }));
     try {
-      const r = await fetch(`/api/youtube/comments?videoId=${m.videoId}`);
+      const r = await fetch(`/api/video-comments?videoId=${m.videoId}`);
       const j = await r.json();
       if (j.disabled) { setCData((p) => ({ ...p, [m.videoId]: { loading: false, disabled: true } })); return; }
       const list = (j.comments ?? []) as YTComment[];
@@ -114,7 +114,7 @@ export default function TrendsPage() {
   const fetchVideos = async (kws: string[], d: number, s: SortMode) => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/youtube/search?keywords=${encodeURIComponent(kws.slice(0, 2).join(","))}&days=${d}&sort=${s}`);
+      const r = await fetch(`/api/video-search?keywords=${encodeURIComponent(kws.slice(0, 2).join(","))}&days=${d}&sort=${s}`);
       const j = await r.json();
       if (r.ok && j.demo === false && Array.isArray(j.videos) && j.videos.length) {
         setVideos(j.videos); setDemo(false); setShowingSaved(false);
@@ -166,7 +166,7 @@ export default function TrendsPage() {
       const top5 = scored.slice(0, 5);
       const lists = await Promise.all(top5.map(async (m) => {
         try {
-          const r = await fetch(`/api/youtube/comments?videoId=${m.videoId}`);
+          const r = await fetch(`/api/video-comments?videoId=${m.videoId}`);
           const j = await r.json();
           if (j.disabled || !(j.comments ?? []).length) return [] as CarrotTitle[];
           return analyzeComments(j.comments).insights.slice(0, 2).map((ins) => ({

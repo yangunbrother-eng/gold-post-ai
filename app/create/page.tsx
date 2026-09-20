@@ -340,7 +340,7 @@ function CreateInner() {
     setYtLoading(true); setYtResults([]); setYtChecked([]); setError("");
     log(`유튜브 자동 검색 시작 (${kws.join(", ")})`);
     try {
-      const response = await fetch(`/api/youtube/search?keywords=${encodeURIComponent(kws.join(","))}&days=30&sort=views`);
+      const response = await fetch(`/api/video-search?keywords=${encodeURIComponent(kws.join(","))}&days=30&sort=views`);
       const result = await response.json();
       if (!response.ok || !Array.isArray(result.videos)) throw new Error("failed");
       const videos = result.videos.slice(0, count);
