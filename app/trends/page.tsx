@@ -69,6 +69,15 @@ export default function TrendsPage() {
   const [analyzedId, setAnalyzedId] = useState<string | null>(null);
   const [madeTitle, setMadeTitle] = useState<Record<string, { title: string; similarity: number }>>({});
   const [top10, setTop10] = useState<CarrotTitle[] | null>(null);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("cpai_youtube_top_titles_v1") || "null");
+      if (Array.isArray(saved) && saved.length && saved.every(t => t && typeof t.title === "string" && typeof t.pattern === "string" && t.scores && [t.scores.recommend, t.scores.interest, t.scores.recency, t.scores.overlap].every(Number.isFinite))) setTop10(saved.slice(0, 10));
+    } catch {}
+  }, []);
+  useEffect(() => {
+    if (top10) try { localStorage.setItem("cpai_youtube_top_titles_v1", JSON.stringify(top10)); } catch {}
+  }, [top10]);
   const [mixingComments, setMixingComments] = useState(false);
   const [cOpen, setCOpen] = useState<string | null>(null);
   const [cData, setCData] = useState<Record<string, { loading: boolean; insights?: CommentInsight[]; keywords?: { w: string; n: number }[]; comments?: YTComment[]; demo?: boolean; disabled?: boolean }>>({});
