@@ -6,7 +6,6 @@ import { useBrand } from "@/lib/store";
 import Icon, { type IconName } from "@/components/Icon";
 
 const TABS: { href: string; label: string; icon: IconName; ariaLabel?: string }[] = [
-  { href: "/", label: "홈", icon: "home" },
   { href: "/create", label: "소식 만들기", icon: "sparkles", ariaLabel: "소식 만들기" },
   { href: "/trends", label: "유튜브", icon: "youtube", ariaLabel: "유튜브에서 주제 찾기" },
   { href: "/daangn", label: "당근 소식", icon: "carrot", ariaLabel: "당근 인기 소식" },
@@ -32,7 +31,7 @@ export default function Topbar({ title, sub }: { title: string; sub?: string }) 
   const [open, setOpen] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const isPrimary = TABS.some((tab) => tab.href === path);
+  const isPrimary = path === "/" || TABS.some((tab) => tab.href === path);
   const close = () => setOpen(false);
 
   useEffect(() => { setOpen(false); }, [path]);
