@@ -78,9 +78,8 @@ export default function PopularDaangn({ preview = false }: { preview?: boolean }
       {collectionMessage && <p role="status" className="section-description">{collectionMessage}</p>}
     </div>}
     {!preview && <div className="daangn-popular-sort" aria-label="업체 및 제목 검색">
-      <input aria-label="업체명 또는 제목 검색" placeholder="업체명·제목 검색 (예: 금박사)" value={search} onChange={e => {setSearch(e.target.value); setPage(1);}} style={{flex:"1 1 200px", minWidth:0, padding:"11px 13px", border:"1px solid #ded8d0", borderRadius:10}} />
+      <input type="search" aria-label="업체명 또는 제목 검색" placeholder="업체명·제목 검색 (예: 금박사)" value={search} onChange={e => {setSearch(e.target.value); setPage(1);}} style={{flex:"1 1 200px", minWidth:0, padding:"11px 13px", border:"1px solid #ded8d0", borderRadius:10}} />
       <button aria-pressed={search === "금박사"} onClick={() => {setSearch("금박사"); setDays(0); setPage(1);}}>금박사만 보기</button>
-      {search && <button onClick={() => {setSearch(""); setPage(1);}}>검색 해제</button>}
     </div>}
     {!preview && <div className="daangn-popular-sort" aria-label="작성 기간">
       {[30,60,90,0].map(value => <button type="button" key={value} aria-pressed={days === value} onClick={() => {setDays(value); setPage(1);}}>{value ? `최근 ${value}일` : "전체"}</button>)}
